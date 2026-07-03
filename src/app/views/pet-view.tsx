@@ -14,9 +14,9 @@ import {
   readCurrentPetWindowPosition,
   setCurrentPetWindowPosition,
   showPanelNearPet,
-  startNativePetWindowDrag,
   trackPetWindowPosition
 } from "../../features/desktop-shell/window-events";
+import type { DesktopPosition } from "../../features/desktop-shell/desktop-window-types";
 
 const PET_DRAG_THRESHOLD_PX = 6;
 const PET_DRAG_POSITION_SYNC_DELAYS_MS = [120, 420, 900, 1800, 3200, 5000];
@@ -100,6 +100,9 @@ export function PetView() {
     let activePointer = true;
     let didStartDrag = false;
     let cleanupTimer: number | undefined;
+    let startWindowPosition: DesktopPosition | null = null;
+    let lastDragScreenX = startScreenX;
+    let lastDragScreenY = startScreenY;
 
     event.preventDefault();
     lastPointerDown.current = {
@@ -108,6 +111,14 @@ export function PetView() {
       at: Date.now()
     };
     void trackPetWindowPosition();
+    void readCurrentPetWindowPosition().then((position) => {
+      if (!activePointer) return;
+      startWindowPosition = position;
+
+      if (didStartDrag && startWindowPosition) {
+        movePetWindowTo(lastDragScreenX, lastDragScreenY);
+      }
+    });
     target.focus({ preventScroll: true });
     target.setPointerCapture(pointerId);
 
@@ -126,23 +137,42 @@ export function PetView() {
     }
 
     function handlePointerMove(pointerEvent: PointerEvent) {
-      if (!activePointer || didStartDrag) return;
-      if (pointerDistance(pointerEvent.screenX, pointerEvent.screenY) < PET_DRAG_THRESHOLD_PX) {
+      if (!activePointer) return;
+
+      lastDragScreenX = pointerEvent.screenX;
+      lastDragScreenY = pointerEvent.screenY;
+
+      if (!didStartDrag && pointerDistance(pointerEvent.screenX, pointerEvent.screenY) < PET_DRAG_THRESHOLD_PX) {
         return;
       }
 
-      didStartDrag = true;
       pointerEvent.preventDefault();
-      suppressPetClickFor(12000);
-      releasePointerCapture(pointerEvent.pointerId);
 
-      void startNativePetWindowDrag()
+      if (!didStartDrag) {
+        didStartDrag = true;
+        suppressPetClickFor(12000);
+      }
+
+      movePetWindowTo(pointerEvent.screenX, pointerEvent.screenY);
+    }
+
+    function movePetWindowTo(screenX: number, screenY: number) {
+      if (!startWindowPosition) return;
+
+      const position = {
+        x: Math.round(startWindowPosition.x + (screenX - startScreenX)),
+        y: Math.round(startWindowPosition.y + (screenY - startScreenY))
+      };
+
+      void setCurrentPetWindowPosition(position)
         .then(() => {
-          scheduleNativePositionSync();
+          const key = positionKey(position);
+          lastObservedWindowPosition.current = key;
+          lastAppliedWindowPosition.current = key;
+          modelRef.current.setPetPosition(position);
         })
         .catch((error) => {
-          console.warn("Native pet drag failed.", error);
-          scheduleNativePositionSync();
+          console.warn("Manual pet window move failed.", error);
         });
     }
 
