@@ -5,4 +5,7 @@ export interface GrowthState {
   completedTaskCount: number;
   eveningReviewCount: number;
   eveningReviewStreak: number;
+  recordedTaskCount: number;
+  tomorrowCatchCount: number;
+  coDoSessionCount: number;
 }

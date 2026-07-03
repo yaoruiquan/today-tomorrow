@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { TaskBucket } from "../task-types";
 
 interface QuickAddProps {
@@ -8,6 +8,7 @@ interface QuickAddProps {
 export function QuickAdd({ onAdd }: QuickAddProps) {
   const [title, setTitle] = useState("");
   const [bucket, setBucket] = useState<TaskBucket>("today");
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   return (
     <form
@@ -16,9 +17,11 @@ export function QuickAdd({ onAdd }: QuickAddProps) {
         event.preventDefault();
         onAdd(title, bucket);
         if (title.trim()) setTitle("");
+        window.setTimeout(() => inputRef.current?.focus(), 0);
       }}
     >
       <input
+        ref={inputRef}
         value={title}
         onChange={(event) => setTitle(event.target.value)}
         type="text"

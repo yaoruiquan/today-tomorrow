@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { normalizeSettings } from "../features/settings/settings-store";
 import { createDefaultAppData } from "./default-app-data";
 import type { AppData } from "./app-types";
 
@@ -31,7 +32,14 @@ export function loadAppData(fallback: AppData = createDefaultAppData()): AppData
     const saved = window.localStorage.getItem(STORAGE_KEY);
     if (!saved) return fallback;
 
-    return normalizeAppData(JSON.parse(saved), fallback);
+    const parsed = JSON.parse(saved);
+    const data = normalizeAppData(parsed, fallback);
+
+    if (hasTransientLaunchState(parsed)) {
+      saveAppData(data);
+    }
+
+    return data;
   } catch {
     return fallback;
   }
@@ -71,6 +79,13 @@ export async function loadPersistedAppData(
 
     const data = normalizeAppData(nativeData, fallback);
     saveAppData(data);
+
+    if (hasTransientLaunchState(nativeData)) {
+      await invoke("save_app_data", {
+        data,
+        sourceId: "launch-normalize"
+      });
+    }
 
     return {
       data,
@@ -145,7 +160,8 @@ function normalizeAppData(value: unknown, fallback: AppData): AppData {
     pet: {
       ...fallback.pet,
       ...partial.pet,
-      panelOpen: false
+      panelOpen: false,
+      lastMessage: undefined
     },
     panel: {
       ...fallback.panel,
@@ -156,9 +172,14 @@ function normalizeAppData(value: unknown, fallback: AppData): AppData {
       ...fallback.growth,
       ...partial.growth
     },
-    settings: {
-      ...fallback.settings,
-      ...partial.settings
-    }
+    settings: normalizeSettings(partial.settings, fallback.settings)
   };
+}
+
+function hasTransientLaunchState(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+
+  const partial = value as Partial<AppData>;
+
+  return Boolean(partial.pet?.lastMessage || partial.pet?.panelOpen || partial.panel?.open);
 }

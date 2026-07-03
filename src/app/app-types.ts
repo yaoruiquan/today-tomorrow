@@ -15,6 +15,10 @@ export interface PetState {
   position?: PetPosition;
   panelOpen: boolean;
   lastMessage?: string;
+  activeCoDoTaskId?: string;
+  coDoStartedAt?: string;
+  lastGentleReminderAt?: string;
+  lastGentleReminderMessage?: string;
 }
 
 export type PanelMode = "tasks" | "eveningReview";

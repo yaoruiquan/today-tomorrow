@@ -122,6 +122,41 @@ Known risks:
 
 Please verify and return `QA RESULT`.
 
+## 2026-07-03 19:10 CST - QA RESULT - T-006 partial
+
+QA RESULT
+Product: 今天明天
+Task ID: T-006
+From: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Verdict: partial
+
+Evidence:
+- Re-read `docs/qa-checklist.md` section 7 and `docs/design/t-006-main-panel-pet-visual-system.md` section 14 before verification.
+- Fresh Web smoke with pnpm 11 / Vite at 560x600: adding Today and Tomorrow tasks worked; reload preserved selected `blueNight` + `bright`; `.task-panel` stayed `590/590` and `body` stayed `600/600`; `playwright console error` returned zero page errors.
+- `npx -y pnpm@11.7.0 check` passed on the current workspace: lint, typecheck, Vitest all green; 8 test files, 32 tests.
+- Rebuilt current source with `rm -rf src-tauri/target/release/bundle && npx -y pnpm@11.7.0 tauri:build`; build passed and generated `src-tauri/target/release/bundle/macos/今天明天.app`.
+- `codesign --verify --deep --strict --verbose=2 src-tauri/target/release/bundle/macos/今天明天.app` passed.
+- Native current rebuild launched and showed the dimensional pet plus the 560x600 panel. Theme/glow controls were visible and selected `blueNight` + bright from persisted data.
+- Failure screenshots:
+  - `output/playwright/t006-native-after-escape-recheck.png`
+  - `output/playwright/t006-native-after-drag-recheck.png`
+
+Findings:
+- P1 - Native Escape hides all app windows, including the pet, while the process stays alive. Repro: launch rebuilt `.app`, click pet to open panel, press Escape. Result: `Computer Use` reports `noWindowsAvailable` / timeout, system screenshot shows no pet or panel, process remains running, and app data still records pet position `{ "x": 1312, "y": 776 }`. Expected: Escape closes only the panel and leaves the collapsed pet visible as the recovery surface.
+- P1 - Pet drag is still not usable and can also leave no visible window. Repro: launch rebuilt `.app`, confirm pet is visible, drag from the pet center toward another point. Result: `Computer Use` reports `noWindowsAvailable`, screenshot shows no visible pet, process remains running, and `app-data.json` pet position does not change. This matches the user's previously reported "mouse still cannot drag the pet" defect.
+- P2 - Current source/current rebuild includes T-007 scope inside the T-006 panel: `小光团能力`, `接住明天`, `轻声提醒`, `靠近回应`, `陪我做这件`, `安静模式`, and `小光团位置`. These map to `docs/qa-checklist.md` section 8 / `docs/design/t-007-pet-growth-interaction-system.md`, contradict the handoff claim that no T-007 behavior was implemented in T-006, and make the one-screen panel denser than the accepted T-006 scope.
+- P2 - Handoff build evidence was stale relative to current source. Before rebuilding, the signed `.app` binary timestamp was older than `dist/index.html` and `src/features/tasks/components/task-panel.tsx`, and the launched app did not match current source. QA rebuilt current source before making this verdict.
+
+Fix request:
+- Keep Escape behavior scoped to hiding the panel window only; ensure the pet window remains visible and focusable after Escape/blur.
+- Fix native pet dragging so it moves the pet window and persists the new position without hiding or losing the window.
+- Remove or feature-gate T-007 controls/behaviors from the T-006 deliverable unless Product/Designer explicitly re-scopes T-006 to include them.
+- Rebuild the signed `.app` from the exact current source after fixes and include fresh pnpm 11 build/signing/native smoke evidence in the next handoff.
+
+CEO decision needed:
+- No for the implementation defects above. Escalate to CEO only if you want to keep the T-007 controls in the T-006 release scope.
+
 ## 2026-07-03 15:43 CST - QA Verifier -> Product Developer
 
 QA RESULT
@@ -156,6 +191,96 @@ Fix request:
 
 CEO decision needed:
 - No. These are implementation/visual acceptance failures already covered by the T-005 criteria and confirmed by user observation.
+
+## 2026-07-03 15:59 CST - QA Verifier -> Product Developer
+
+QA RESULT
+Product: 今天明天
+Task ID: T-005
+From: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Verdict: partial
+
+Evidence:
+- Opened the signed native app at `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app` and used it through the macOS UI as a user.
+- The first-launch collapsed pet still showed/persisted the previous `我回来了。` state in accessibility, and visually exposed a clipped white speech/edge area around the pet.
+- Pressing `Tab` on the collapsed pet shows a large blue focus outline around the whole `144x144` square window, making the hidden square container highly visible.
+- With focus on the pet button, `Return` opened the panel; `Space` did not open it.
+- Mouse/pointer clicks on the pet were not consistently reliable during the walkthrough: multiple clicks left the app on the `小光团` window before keyboard activation finally opened the panel.
+- The panel opened with the expected today/tomorrow UI, but an empty panel still displayed a prominent vertical scrollbar on the right edge.
+- Keyboard traversal inside the panel is unstable: after opening the panel, pressing `Tab` caused the panel to hide and focus returned to the `小光团` window instead of moving through input/buttons.
+- Attempting to interact with the input field during the walkthrough caused the panel to hide at least once, returning the user to the pet window.
+- On this multi-display setup, the pet/panel could appear on the secondary display (`pet` at negative global X coordinates). That can be valid placement, but there is no visible recovery or "bring back to screen" affordance if the user loses it.
+
+Findings:
+- P1: Panel interaction/focus handling is too fragile for a task-entry app. Reproduction: open the panel from the pet, then use keyboard `Tab` to move through controls or click into the input field. Expected: focus stays inside the panel and the user can add a task. Actual: the panel can hide and return to the pet window, interrupting task entry.
+- P1: The collapsed pet still reads as a square window rather than only a small glow pet. The issue is stronger when keyboard focus is visible: the focus ring outlines the full square, and the persisted message state can expose clipped white UI around the pet.
+- P2: Pet activation is not consistent across expected input methods. `Return` activates the focused pet button, but `Space` does not; pointer clicks were also inconsistent in this walkthrough. A button-like control should support both Enter/Return and Space, and click should reliably open the panel.
+- P2: Empty panel polish issue: the panel shows a right-side scrollbar even when the visible content fits, which makes the desktop panel feel like an embedded web page rather than a lightweight native task panel.
+- P2: Stale pet message persists across restarts (`我回来了。`), so the collapsed pet can launch with old feedback instead of a clean idle state.
+- P2: Multi-display placement needs a recovery strategy. If the pet opens on another display or near an unexpected screen edge, there is no visible reset/bring-to-current-screen action.
+
+Fix request:
+- Make panel focus handling robust: clicking or tabbing inside the panel must not trigger blur-hide. Hide on blur should distinguish true external focus loss from focus movement within the panel.
+- Fix pet keyboard activation so `Space` and `Return` both activate the pet button.
+- Make pointer click-to-open reliable after prior drag attempts and across repeated launches.
+- Rework collapsed pet visual/focus treatment so accessibility focus remains usable without revealing a square desktop tile.
+- Remove the unnecessary panel scrollbar in the empty/default state.
+- Clear or expire transient pet messages on relaunch, or render them in a way that cannot clip inside the pet window.
+- Add a reset/recenter recovery path for pet position, especially for multi-display setups.
+
+CEO decision needed:
+- No for these implementation fixes. Escalate only if Product/Design wants to change the acceptance criterion from "only the small glow pet" to a visible tile-style desktop widget.
+
+## 2026-07-03 16:07 CST - QA Verifier -> Product Developer
+
+QA RESULT ADDENDUM
+Product: 今天明天
+Task ID: T-005
+From: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Verdict: partial
+
+Evidence:
+- User independently confirmed the P1 native drag issue: "我的鼠标现在还不能拖动小光团".
+- This matches QA's earlier reproduction where dragging the pet did not change native window bounds.
+
+Finding:
+- P1 remains active: the desktop pet cannot be moved by mouse drag in real use. This blocks acceptance of the T-005 drag and moved-position persistence criteria.
+
+Fix request:
+- Prioritize fixing pet drag. After the fix, provide fresh evidence that mouse drag changes the native `pet` window bounds and that the moved position persists after relaunch.
+
+CEO decision needed:
+- No. This is an implementation failure against an existing acceptance criterion.
+
+## 2026-07-03 16:22 CST - CEO / Product Owner -> Product Designer
+
+Task: T-006
+Status: doing
+Summary:
+- CEO accepted the native walkthrough feedback as a design-first product scope update.
+- Product Designer owns the main panel and pet visual system redesign before Product Developer implementation.
+- The next required output is an implementation-ready `DESIGN -> DEVELOPMENT` handoff.
+
+Evidence:
+- User feedback: main planning panel needs to look better, feel smoother, avoid default scrolling, gain hierarchy/depth, support pet color themes, expose glow intensity, and make the pet feel more dimensional/3D.
+- QA synthesis: this is not a T-005 implementation bug; it should become T-006 and stay aligned with the lightweight, healing, quiet today/tomorrow positioning.
+- Coordination state updated in `docs/agents/board.md`, `docs/agents/messages.md`, `docs/agents/handoffs.md`, and `docs/agents/decisions.md`.
+
+Changed Files:
+- `docs/agents/board.md`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+- `docs/agents/decisions.md`
+
+Requests:
+- Produce a product/design pass for T-006 that covers one-screen default panel behavior, compact fixed-height regions, clearer hierarchy/depth, 4-5 gentle pet themes, glow intensity control, dimensional pet styling, and implementation-ready acceptance criteria.
+- Send the final handoff directly to Product Developer using the documented `DESIGN -> DEVELOPMENT` format.
+
+Risks:
+- Avoid turning the product into a heavy task-management dashboard; keep the low-distraction identity.
+- Product Developer should not begin T-006 implementation until the design handoff is available.
 
 ## 2026-07-03 13:39 CST - QA Verifier -> Product Developer
 
@@ -254,6 +379,88 @@ Acceptance criteria to verify:
 Known risks:
 - `pnpm exec tauri info` still reports missing `rustc`, `cargo`, `rustup`, and full Xcode. This is unchanged and remains the T-005 environment blocker.
 - Native Tauri compile/runtime behavior has not been accepted in T-004.
+
+Please verify and return `QA RESULT`.
+
+## 2026-07-03 19:05 CST - Product Developer -> QA Verifier
+
+DEVELOPMENT -> QA
+Product: 今天明天
+Task ID: T-007
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+Subject: Ready for T-007 verification
+
+Implemented:
+- Added T-007 settings with safe persistence / fallback: `catchTomorrowEnabled`, `gentleRemindersEnabled`, `hoverInteractionEnabled`, `coDoCheckInEnabled`, `quietMode`, and `desktopPlacement`.
+- Added visual growth inputs for recorded tasks, completed tasks, evening review, `接住明天`, and `陪做模式`; growth remains represented through pet light quality / visual maturity only.
+- Added compact ability strip with toggles for `接住明天`, `轻声提醒`, and hover response.
+- Added explicit `接住明天` evening confirmation: `接住明天` moves unfinished today tasks to Tomorrow only after user click; `先留在今天` dismisses without moving.
+- Added `轻声提醒` as quiet inline/pet visual state with one-hour frequency cap and suppression by `安静模式`.
+- Added `安静模式` duration control: off, `1 小时`, `到明天`, and `一直开启`; pet remains visible and panel/task operations remain usable.
+- Added `陪做模式` task-row action with at most one active task, `陪做中` chip, manual stop, and automatic exit on task completion.
+- Added hover interaction on collapsed pet that subtly changes the body highlight/core without opening the panel or stealing focus; reduced motion / quiet mode minimize movement.
+- Moved growth specks inside the pet body so maturity reads as internal light, not external decoration.
+- Added compact desktop placement selector and native Tauri `place_pet_window` command for screen corners; existing drag memory and `回到屏幕内` recovery remain.
+- Kept scope boundaries: no extra complex pet emotions, no daily ritual flow, no semantic task analysis, no XP/streak/score/punishment UI, no pet shop or heavy settings surface.
+
+Changed files:
+- `src/app/app-types.ts`
+- `src/app/default-app-data.ts`
+- `src/app/app-model.ts`
+- `src/app/app-model.test.ts`
+- `src/app/views/panel-view.tsx`
+- `src/app/views/pet-view.tsx`
+- `src/features/desktop-shell/desktop-window-types.ts`
+- `src/features/desktop-shell/window-events.ts`
+- `src/features/growth/growth-rules.ts`
+- `src/features/growth/growth-rules.test.ts`
+- `src/features/growth/growth-types.ts`
+- `src/features/pet/components/glow-pet.tsx`
+- `src/features/settings/default-settings.ts`
+- `src/features/settings/settings-store.ts`
+- `src/features/settings/settings-store.test.ts`
+- `src/features/settings/settings-types.ts`
+- `src/features/settings/theme-options.ts`
+- `src/features/tasks/components/task-column.tsx`
+- `src/features/tasks/components/task-item.tsx`
+- `src/features/tasks/components/task-panel.tsx`
+- `src/shared/styles/base.css`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/window.rs`
+- `docs/agents/board.md`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+
+Verification already run:
+- `pnpm check` passed: lint, typecheck, and Vitest all green; 8 test files, 32 tests.
+- `pnpm build` passed.
+- Playwright T-007 smoke passed with system Chrome; result file: `output/playwright/t007-visual-smoke-result.json`.
+- Playwright checks passed: empty panel no internal scrollbar, empty footer no overflow, light-task panel no internal scrollbar, light footer no overflow, one `陪做中` chip, evening `接住明天` confirmation visible, `先留在今天` keeps today tasks, confirmed `接住明天` moves today tasks to tomorrow without failure/overdue/punishment labels, quiet mode select shows `always`, quiet mode suppresses reminder strip highlight, pet hover does not open panel, pet exposes body-level reminder and co-do visual states.
+- Screenshots:
+  - `output/playwright/t007-panel-empty.png`
+  - `output/playwright/t007-panel-light-codo-catch.png`
+  - `output/playwright/t007-panel-after-catch.png`
+  - `output/playwright/t007-panel-quiet.png`
+  - `output/playwright/t007-pet-hover-codo.png`
+- `npx -y pnpm@11.7.0 tauri:build` passed and generated `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`.
+- `codesign --verify --deep --strict --verbose=2 /Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app` passed.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; npx -y pnpm@11.7.0 exec tauri info` reached environment reporting with Rust/Cargo/rustup installed; full Xcode still missing.
+
+Acceptance criteria to verify:
+- `docs/qa-checklist.md` section `8. T-007 养成与桌面互动验收项`.
+- `docs/design/t-007-pet-growth-interaction-system.md` section 10 acceptance criteria.
+- Growth is visual-only and can progress through stable use / `接住明天`, not only task completion.
+- `接住明天` can be enabled/disabled and never silently moves unfinished tasks before explicit confirmation.
+- Hover gives subtle pet-body life without opening the panel, stealing focus, or blocking drag.
+- `轻声提醒` is visual/quiet, capped, non-shaming, and suppressed by `安静模式`.
+- `安静模式` supports `1 小时`, `到明天`, and `一直开启`, while keeping panel/task flows usable.
+- `陪做模式` supports exactly one active task; complete or stop exits it; no Pomodoro or efficiency statistics.
+- Desktop position memory, `回到屏幕内`, panel-near-pet behavior, and light curated personalization remain intact.
+
+Known risks:
+- Browser Playwright smoke cannot prove native macOS drag + hover coexistence, native corner placement, or multi-display behavior. QA should verify those in the signed `.app`.
+- Full Xcode remains missing, so Apple notarization, Developer ID signing, and formal distribution are not verified.
 
 Please verify and return `QA RESULT`.
 
@@ -412,5 +619,251 @@ Known risks:
 - Full Xcode is still missing on this machine. Apple notarization, Developer ID signing, and final release distribution are not verified.
 - DMG is intentionally not the default T-005 artifact. A future release-packaging task should either fix the Tauri/create-dmg output path issue or generate DMG on a release machine with a verified packaging workflow.
 - Because the Tauri identifier changed to `com.todaytomorrow.desktop`, any pre-release local app-data tied to `com.todaytomorrow.app` may not carry over. No user migration is added because this build has not been released.
+
+Please verify and return `QA RESULT`.
+
+## 2026-07-03 16:45 CST - T-006 Design To Development Handoff
+
+DESIGN -> DEVELOPMENT
+Product: 今天明天
+Task ID: T-006
+From: Product Designer / `019f2224-1f3c-7a50-8923-f43becf03219`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Subject: Main panel and pet visual system redesign
+
+Design intent:
+The main planning panel should feel polished, quiet, and smooth: one-screen in the normal empty/light-task state, with clearer depth and hierarchy. Today should read as the active focus area; tomorrow should read as a soft shelf that catches work. The collapsed pet should feel like a dimensional self-emissive glowing sphere with gentle theme color and adjustable glow, not a flat square web tile and not a sphere surrounded by a separate halo/ring.
+
+Required behavior:
+- Main panel uses fixed compact regions: top status strip, quick add, today/tomorrow planning body, evening review/action strip, and optional compact footer controls.
+- Default empty state and light-task state show no internal scrollbar.
+- Light-task state means today and tomorrow each have 0-5 open tasks.
+- Today area is visually stronger than tomorrow through accent, elevation, or header treatment.
+- Tomorrow area is labeled / perceived as `明天接住` or equivalent shelf.
+- Quick add remains one-row, fast, and focused after adding tasks.
+- Overflow beyond 5 open tasks per bucket uses compact overflow rows rather than full-panel scrolling.
+- Provide 5 theme IDs: `warmGlow`, `mintFocus`, `lavenderCalm`, `blueNight`, `peachRest`.
+- Theme changes pet body self-emission tint, panel accent, selected controls, and small decoration without changing task behavior.
+- Provide 3 glow intensity IDs: `low`, `soft`, `bright`; default `soft`.
+- Glow intensity affects pet core brightness, edge bloom, and panel accent bloom, and persists across restart.
+- Reduced motion preserves static glow settings while disabling or minimizing continuous breathing/parallax.
+- Collapsed pet uses layered radial gradients, top-left highlight, inner shading, subtle face depth, and elliptical floor shadow.
+- Pet glow must originate from the body and edge of the sphere; do not implement a separate decorative halo/ring around the pet.
+- Keyboard focus must remain visible without revealing a square pet window tile.
+- Old transient pet messages must not persist or clip in collapsed state after relaunch.
+- Provide a compact `回到屏幕内` / reset-position recovery action.
+
+Acceptance criteria:
+- QA checklist section `7. T-006 主面板与宠物视觉验收项` passes.
+- `docs/design/t-006-main-panel-pet-visual-system.md` section 14 acceptance criteria pass.
+- Theme and glow choices persist across app restart.
+- Normal task add/review flow remains low-friction and does not introduce projects, tags, priorities, or dashboard density.
+- Visual additions remain soft, low-distraction, and aligned with the product positioning.
+
+Open implementation questions:
+- Please confirm whether the current native `panel` window can comfortably target `520-560px` width and `560-620px` height near the pet without screen-edge clipping. If not, propose the closest one-screen dimensions that preserve the design intent.
+- Please confirm where theme/glow preferences should live in the existing state model. Product requirement is persistence with safe fallback; exact storage module is developer-owned.
+- Please confirm whether a compact footer control row or app/tray menu is the cheapest place for `回到屏幕内`.
+
+Allowed negotiation:
+- Product Developer may omit parallax highlights if they risk complexity; preserve dimensional sphere through gradients/highlight/shadow.
+- Product Developer may implement particles as static pseudo-elements instead of generated particles.
+- Product Developer may use a compact menu instead of swatches if swatches delay implementation.
+- Product Developer may make overflow rows non-interactive in the first pass if count communication is clear.
+- Product Developer should propose a simpler implementation if it preserves the one-screen, quiet, themed, dimensional product feeling.
+
+Please respond with feasibility, implementation plan, risks, and any product questions.
+
+## 2026-07-03 17:57 CST - T-006 Pet Glow Clarification To Development
+
+DESIGN -> DEVELOPMENT
+Product: 今天明天
+Task ID: T-006
+From: Product Designer / `019f2224-1f3c-7a50-8923-f43becf03219`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Subject: Pet glow must come from the body itself
+
+Design intent:
+User clarified that the desired pet visual is not a halo surrounding the pet. The pet itself should emit light: a dimensional self-emissive sphere whose glow originates from the core and softly spills from the body edge.
+
+Required behavior:
+- Theme changes pet body color and self-emission tint, not a separate surrounding halo.
+- Glow intensity tunes core brightness, edge bloom, and subtle body spill light.
+- Any blur or bloom outside the sphere must read as light leaking from the sphere surface / edge, not as an independent decorative ring or orbiting aura.
+- Focus styling remains visible but must not read as pet glow or reveal a square tile.
+- Panel accent bloom may still respond to glow intensity, but the pet itself remains the light source.
+
+Acceptance criteria:
+- Collapsed pet looks like a dimensional self-emissive glowing sphere.
+- QA can verify that the glow originates from the pet body / edge, not a separate halo, ring, or aura.
+- Existing T-006 one-screen panel, theme persistence, glow persistence, and reduced-motion requirements remain unchanged.
+
+Open implementation questions:
+- None blocking. If CSS implementation needs a separate pseudo-element for blur, it should be visually clipped or anchored so it reads as body edge bloom rather than an external halo.
+
+Allowed negotiation:
+- Product Developer may use layered gradients, box-shadow, filter blur, pseudo-elements, or masks as long as the final visual reads as self-emission from the pet body.
+
+Outcome:
+Clarification sent directly to Product Developer thread `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`; no CEO decision needed.
+
+## 2026-07-03 18:14 CST - T-007 Design Reference To Development
+
+DESIGN -> DEVELOPMENT
+Product: 今天明天
+Task ID: T-007
+From: Product Designer / `019f2224-1f3c-7a50-8923-f43becf03219`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Subject: Pet growth and desktop interaction design reference
+
+Design intent:
+User selected the next product directions: growth system, pet abilities, desktop space, and personalization. User explicitly excluded additional pet states, daily rituals, and content-semantic linkage for this pass.
+
+Required behavior if / when T-007 is assigned:
+- Growth is shown through light quality / visual maturity, not XP, streaks, productivity scores, or punishment.
+- Pet abilities are `接住明天`, hover interaction, `轻声提醒`, `安静模式`, and `陪做模式`.
+- `接住明天` is user-controlled and must not silently move tasks without confirmation.
+- Hover adds subtle life without opening the panel, stealing focus, or interfering with drag.
+- `轻声提醒` is visual, quiet, capped in frequency, and suppressed by `安静模式`.
+- `陪做模式` supports at most one active task and is not a required Pomodoro mechanic.
+- Desktop space covers remembered position, `回到屏幕内`, edge behavior, and panel opening near the pet.
+- Personalization stays curated: no pet shop, full theme editor, semantic personality analysis, or heavy settings surface.
+
+Reference docs:
+- `docs/design/t-007-pet-growth-interaction-system.md`
+- `docs/product-spec.md`
+- `docs/qa-checklist.md`
+- `docs/agents/board.md`
+
+Open implementation questions:
+- None yet. This is a design-ready reference, not an instruction to interrupt current T-006 work unless CEO / user assigns T-007 next.
+
+Outcome:
+Design reference sent directly to Product Developer thread `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`.
+
+## 2026-07-03 19:37 CST - T-008 Design To Development Handoff
+
+DESIGN -> DEVELOPMENT
+Product: 今天明天
+Task ID: T-008
+From: Product Designer / `019f2224-1f3c-7a50-8923-f43becf03219`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Subject: Frontend smoothness and progressive interaction polish
+
+Design intent:
+Make the current T-006 / T-007 frontend experience feel smooth, calm, and user-led. The main panel should feel like a lightweight desktop planning note first; pet abilities and settings should feel available but not exposed as a control dashboard.
+
+Required behavior:
+- Native panel internal interactions must not collapse the panel: quick-add input, typing, radio/select controls, task rows, settings, `接住明天`, `下班整理`, and `回到屏幕内`.
+- Panel opens with quick-add focused after the panel is visible; first typed character must be accepted.
+- Add task clears input and returns focus to quick-add.
+- Default panel hides most ability/desktop settings behind a compact settings control.
+- Default companion strip becomes message/status first, not a row of ability toggles.
+- Task row idle state shows completion circle and title; `陪做` and move actions reveal on hover/focus or compact row action surface.
+- `陪做中` remains visible when active.
+- `接住明天` master toggle lives in settings; the visible magic is the timely evening suggestion with `接住明天` / `先留在今天`.
+- Panel open/close has a short, calm pet-anchored transition and respects reduced motion.
+- Pet self-emission is polished to reduce ring-like outer edge perception.
+
+Acceptance criteria:
+- QA checklist section `9. T-008 前端丝滑度验收项` passes.
+- `docs/design/t-008-frontend-smoothness-polish.md` section 15 acceptance criteria pass.
+- Existing T-006 one-screen layout and T-007 abilities remain intact.
+- No projects, tags, priorities, dashboards, AI task analysis, full settings page, or new growth mechanics are introduced.
+
+Open implementation questions:
+- Please confirm whether native panel hide behavior can reliably distinguish internal panel focus / pointer interactions from true external blur. If the Tauri window API makes this hard, propose the safest fallback.
+- Please confirm the lightest implementation for compact settings: popover, details panel, or inline expanding footer.
+- Please confirm how row actions should behave on non-hover environments if relevant for the desktop target.
+
+Allowed negotiation:
+- Product Developer may keep theme and glow visible in the footer if they remain visually light.
+- Product Developer may choose a compact menu instead of hover-only row actions if keyboard accessibility and discoverability are better.
+- Product Developer may implement pet-panel transition with CSS opacity/scale only if native window positioning limits richer spatial motion.
+
+Please respond with feasibility, implementation plan, risks, and any product questions.
+
+## 2026-07-03 18:19 CST - Product Developer -> QA Verifier
+
+DEVELOPMENT -> QA
+Product: 今天明天
+Task ID: T-006
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+Subject: Ready for T-006 verification
+
+Implemented:
+- Refactored the main task panel into a compact one-screen surface targeting the accepted native `560x600` panel size.
+- Added fixed panel regions: top status strip, one-row quick add, Today focus / `明天接住` planning body, evening review/action strip, and compact footer controls.
+- Made Today visually stronger through accent/elevation/header treatment and made Tomorrow read as a softer receiving shelf.
+- Kept quick add one-row and restored input focus after submit.
+- Capped visible open tasks at 5 per bucket and added compact overflow rows beyond that count.
+- Added five stable theme IDs: `warmGlow`, `mintFocus`, `lavenderCalm`, `blueNight`, and `peachRest`.
+- Added three glow intensity IDs: `low`, `soft`, and `bright`, with default `soft`.
+- Persisted theme/glow through `settings.petThemeId` and `settings.glowIntensity`, with normalization fallback to `warmGlow` and `soft` for missing/invalid saved data.
+- Applied theme/glow to pet body color/self-emission tint, panel accent bloom, selected controls, checkbox done state, and small decoration without changing task behavior.
+- Adjusted collapsed pet to be a self-emissive dimensional sphere: layered radial gradients, top-left highlight, lower-right inner shade, face depth, body brightness, subtle body spill light, and elliptical floor shadow.
+- Removed the separate pet aura / halo / edge-bloom DOM layer after Designer clarified that glow must originate from the pet body itself.
+- Added reduced-motion support so continuous pet breathing is minimized while static glow/brightness remains.
+- Added compact footer `回到屏幕内` action wired to the existing native recenter command; app/tray recovery entry remains available.
+- Acknowledged T-007 as future reference only; no T-007 behavior was implemented in T-006.
+
+Changed files:
+- `src/features/settings/settings-types.ts`
+- `src/features/settings/default-settings.ts`
+- `src/features/settings/settings-store.ts`
+- `src/features/settings/settings-store.test.ts`
+- `src/features/settings/theme-options.ts`
+- `src/app/app-storage.ts`
+- `src/app/app-model.ts`
+- `src/app/app-model.test.ts`
+- `src/app/views/panel-view.tsx`
+- `src/app/views/pet-view.tsx`
+- `src/features/tasks/components/task-panel.tsx`
+- `src/features/tasks/components/task-column.tsx`
+- `src/features/tasks/components/quick-add.tsx`
+- `src/features/pet/components/glow-pet.tsx`
+- `src/shared/styles/base.css`
+- `src-tauri/tauri.conf.json`
+- `docs/agents/board.md`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+
+Verification already run:
+- `pnpm check` passed: lint, typecheck, and Vitest all green; 8 files, 27 tests.
+- `pnpm build` passed.
+- Playwright visual smoke passed at `560x600`; results written to `output/playwright/t006-visual-smoke-result.json`.
+- Screenshots:
+  - `output/playwright/t006-panel-empty.png`
+  - `output/playwright/t006-panel-light.png`
+  - `output/playwright/t006-panel-blue-bright.png`
+  - `output/playwright/t006-pet-blue-bright.png`
+- Empty panel smoke: `.task-panel` clientHeight/scrollHeight `590/590`; body clientHeight/scrollHeight `600/600`; required regions all present.
+- Light-task smoke: 5 open tasks in Today and 5 in Tomorrow; `.task-panel` clientHeight/scrollHeight `590/590`; Today column `303/303`; Tomorrow column `303/303`; no overflow rows; Tomorrow title is `明天接住`.
+- Overflow smoke: 6 open tasks in each bucket produces compact rows `还有 1 件，先放在后面` and `明天还放着 1 件`; Today and Tomorrow columns remain `303/303`.
+- Theme/glow persistence smoke: selecting `blueNight` + `bright` persisted to localStorage and survived reload.
+- Pet visual smoke: no `.pet-shell-aura` or `.pet-edge-bloom` element exists; `.pet-shell-body` carries brightness and body box-shadow emission.
+- Reduced-motion smoke: with reduced motion enabled, the pet body animation duration is `0.001s` and static brightness remains.
+- `npx -y pnpm@11.7.0 tauri:build` passed and generated `src-tauri/target/release/bundle/macos/今天明天.app`.
+- `codesign --verify --deep --strict --verbose=2 src-tauri/target/release/bundle/macos/今天明天.app` passed.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; npx -y pnpm@11.7.0 exec tauri info` reached environment reporting with Rust/Cargo/rustup installed; full Xcode still missing.
+
+Acceptance criteria to verify:
+- QA checklist section `7. T-006 主面板与宠物视觉验收项`.
+- `docs/design/t-006-main-panel-pet-visual-system.md` section 14 acceptance criteria.
+- Empty/default and light-task states show no visible internal scrollbar.
+- Today is visually stronger than Tomorrow, and Tomorrow reads as `明天接住` shelf.
+- Quick add remains low-friction and focused after adding tasks.
+- Theme and glow controls persist after native app restart.
+- Glow intensity affects pet body brightness/self-emission and panel accent bloom.
+- Collapsed pet reads as a dimensional self-emissive sphere, not as an external halo/ring/aura.
+- Keyboard focus remains visible without exposing a square pet tile.
+- Footer/app-tray recovery can return pet to the visible screen.
+- Normal add/move/complete/review task behavior remains unchanged and no projects/tags/priorities/dashboard density were introduced.
+
+Known risks:
+- Browser screenshots prove layout and DOM/CSS behavior, but QA should still visually inspect native transparent-window compositing in the signed `.app`.
+- Full Xcode is still missing, so Apple notarization, Developer ID signing, and formal distribution are not verified.
+- T-007 was acknowledged only; it is not part of this verification request.
 
 Please verify and return `QA RESULT`.

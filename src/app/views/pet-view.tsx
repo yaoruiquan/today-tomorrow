@@ -1,4 +1,9 @@
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent
+} from "react";
 import { useAppModel } from "../app-model";
 import { GlowPet } from "../../features/pet/components/glow-pet";
 import { PetMessage } from "../../features/pet/components/pet-message";
@@ -6,16 +11,25 @@ import { TaskPanel } from "../../features/tasks/components/task-panel";
 import {
   isTauriRuntime,
   listenToCurrentWindowMove,
+  readCurrentPetWindowPosition,
   setCurrentPetWindowPosition,
   showPanelNearPet,
-  startDraggingPetWindow
+  startNativePetWindowDrag,
+  trackPetWindowPosition
 } from "../../features/desktop-shell/window-events";
+
+const PET_DRAG_THRESHOLD_PX = 6;
+const PET_DRAG_POSITION_SYNC_DELAYS_MS = [120, 420, 900, 1800, 3200, 5000];
+const PET_POINTER_CLICK_WINDOW_MS = 8000;
 
 export function PetView() {
   const model = useAppModel();
   const modelRef = useRef(model);
   const panelRef = useRef<HTMLElement | null>(null);
-  const suppressClickAfterDrag = useRef(false);
+  const suppressClickUntil = useRef(0);
+  const lastPointerDown = useRef<{ screenX: number; screenY: number; at: number } | null>(null);
+  const lastAppliedWindowPosition = useRef<string | null>(null);
+  const lastObservedWindowPosition = useRef<string | null>(null);
 
   useEffect(() => {
     modelRef.current = model;
@@ -25,13 +39,11 @@ export function PetView() {
     if (!isTauriRuntime()) return;
 
     let unlisten: (() => void) | undefined;
-    const savedPosition = modelRef.current.data.pet.position;
-
-    if (savedPosition) {
-      void setCurrentPetWindowPosition(savedPosition);
-    }
 
     void listenToCurrentWindowMove((position) => {
+      const key = positionKey(position);
+      lastObservedWindowPosition.current = key;
+      lastAppliedWindowPosition.current = key;
       modelRef.current.setPetPosition(position);
     }).then((cleanup) => {
       unlisten = cleanup;
@@ -41,6 +53,19 @@ export function PetView() {
       unlisten?.();
     };
   }, []);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    const savedPosition = model.data.pet.position;
+    if (!savedPosition) return;
+
+    const key = positionKey(savedPosition);
+    if (lastAppliedWindowPosition.current === key || lastObservedWindowPosition.current === key) return;
+
+    lastAppliedWindowPosition.current = key;
+    void setCurrentPetWindowPosition(savedPosition);
+  }, [model.data.pet.position]);
 
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
@@ -68,39 +93,100 @@ export function PetView() {
   function handlePetPointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
     if (!isTauriRuntime() || event.button !== 0) return;
 
-    const startX = event.clientX;
-    const startY = event.clientY;
-    let dragStarted = false;
+    const target = event.currentTarget;
+    const pointerId = event.pointerId;
+    const startScreenX = event.screenX;
+    const startScreenY = event.screenY;
+    let activePointer = true;
+    let didStartDrag = false;
+    let cleanupTimer: number | undefined;
 
-    function cleanup() {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", cleanup);
-      window.removeEventListener("pointercancel", cleanup);
+    event.preventDefault();
+    lastPointerDown.current = {
+      screenX: startScreenX,
+      screenY: startScreenY,
+      at: Date.now()
+    };
+    void trackPetWindowPosition();
+    target.focus({ preventScroll: true });
+    target.setPointerCapture(pointerId);
+
+    function cleanup(pointerEvent: PointerEvent) {
+      activePointer = false;
+
+      if (pointerEvent.type === "pointerup" && !didStartDrag) {
+        suppressPetClickFor(180);
+        void openPetPanel();
+      } else if (didStartDrag) {
+        suppressPetClickFor(3000);
+        scheduleNativePositionSync();
+      }
+
+      removePointerListeners(pointerEvent.pointerId);
     }
 
     function handlePointerMove(pointerEvent: PointerEvent) {
-      if (dragStarted) return;
+      if (!activePointer || didStartDrag) return;
+      if (pointerDistance(pointerEvent.screenX, pointerEvent.screenY) < PET_DRAG_THRESHOLD_PX) {
+        return;
+      }
 
-      const distance = Math.hypot(pointerEvent.clientX - startX, pointerEvent.clientY - startY);
-      if (distance < 4) return;
+      didStartDrag = true;
+      pointerEvent.preventDefault();
+      suppressPetClickFor(12000);
+      releasePointerCapture(pointerEvent.pointerId);
 
-      dragStarted = true;
-      suppressClickAfterDrag.current = true;
-      cleanup();
-      void startDraggingPetWindow();
+      void startNativePetWindowDrag()
+        .then(() => {
+          scheduleNativePositionSync();
+        })
+        .catch((error) => {
+          console.warn("Native pet drag failed.", error);
+          scheduleNativePositionSync();
+        });
+    }
+
+    function pointerDistance(screenX: number, screenY: number) {
+      return Math.hypot(screenX - startScreenX, screenY - startScreenY);
+    }
+
+    function releasePointerCapture(pointerId: number) {
+      if (target.hasPointerCapture(pointerId)) {
+        target.releasePointerCapture(pointerId);
+      }
+    }
+
+    function removePointerListeners(pointerId: number) {
+      releasePointerCapture(pointerId);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", cleanup);
+      window.removeEventListener("pointercancel", cleanup);
+
+      if (cleanupTimer) {
+        window.clearTimeout(cleanupTimer);
+        cleanupTimer = undefined;
+      }
     }
 
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", cleanup, { once: true });
     window.addEventListener("pointercancel", cleanup, { once: true });
+    cleanupTimer = window.setTimeout(() => {
+      if (didStartDrag) scheduleNativePositionSync();
+      activePointer = false;
+      removePointerListeners(pointerId);
+    }, 8000);
   }
 
-  async function handlePetClick() {
-    if (suppressClickAfterDrag.current) {
-      suppressClickAfterDrag.current = false;
+  async function handlePetClick(event?: ReactMouseEvent<HTMLButtonElement>) {
+    if (Date.now() < suppressClickUntil.current || shouldSuppressPointerClick(event)) {
       return;
     }
 
+    await openPetPanel();
+  }
+
+  async function openPetPanel() {
     const openedNativePanel = await showPanelNearPet();
 
     if (openedNativePanel) {
@@ -111,19 +197,69 @@ export function PetView() {
     model.togglePanel();
   }
 
+  function suppressPetClickFor(durationMs: number) {
+    suppressClickUntil.current = Math.max(suppressClickUntil.current, Date.now() + durationMs);
+  }
+
+  function shouldSuppressPointerClick(event?: ReactMouseEvent<HTMLButtonElement>) {
+    if (!event || !isTauriRuntime()) return false;
+
+    const pointerDown = lastPointerDown.current;
+    if (!pointerDown) return false;
+
+    const clickAgeMs = Date.now() - pointerDown.at;
+    if (clickAgeMs > PET_POINTER_CLICK_WINDOW_MS) return false;
+
+    const clickDistance = Math.hypot(event.screenX - pointerDown.screenX, event.screenY - pointerDown.screenY);
+    if (clickDistance < PET_DRAG_THRESHOLD_PX) return false;
+
+    lastPointerDown.current = null;
+    suppressPetClickFor(2000);
+    return true;
+  }
+
+  function scheduleNativePositionSync() {
+    for (const delay of PET_DRAG_POSITION_SYNC_DELAYS_MS) {
+      window.setTimeout(() => {
+        void syncNativePetPosition();
+      }, delay);
+    }
+  }
+
+  async function syncNativePetPosition() {
+    const position = await readCurrentPetWindowPosition();
+    if (!position) return;
+
+    const key = positionKey(position);
+    lastObservedWindowPosition.current = key;
+    lastAppliedWindowPosition.current = key;
+    modelRef.current.setPetPosition(position);
+  }
+
   return (
-    <main className="pet-window" aria-label="桌宠桌面态">
+    <main
+      className="pet-window"
+      aria-label="桌宠桌面态"
+      data-theme={model.data.settings.petThemeId}
+      data-glow={model.data.settings.glowIntensity}
+      data-reduced-motion={model.data.settings.reducedMotion ? "true" : undefined}
+      data-quiet={model.quietModeActive ? "true" : undefined}
+    >
       <div className="pet-stage">
         <GlowPet
           mood={model.displayMood}
           growthStage={model.data.growth.stage}
+          hoverEnabled={model.data.settings.hoverInteractionEnabled}
+          quietModeActive={model.quietModeActive}
+          gentleReminderActive={model.gentleReminderActive}
+          coDoActive={Boolean(model.activeCoDoTask)}
           onClick={handlePetClick}
           onPointerDown={handlePetPointerDown}
         />
         <PetMessage
           key={model.data.pet.lastMessage ?? "empty-message"}
           message={model.data.pet.lastMessage}
-          visible={Boolean(model.data.pet.lastMessage)}
+          visible={!isTauriRuntime() && Boolean(model.data.pet.lastMessage)}
         />
       </div>
 
@@ -134,4 +270,8 @@ export function PetView() {
       ) : null}
     </main>
   );
+}
+
+function positionKey(position: { x: number; y: number }): string {
+  return `${Math.round(position.x)}:${Math.round(position.y)}`;
 }

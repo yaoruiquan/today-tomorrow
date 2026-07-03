@@ -84,3 +84,47 @@ Rejected:
 
 Review Trigger:
 - Revisit after T-004 passes clean pnpm commands and T-005 returns native desktop QA evidence.
+
+## D-005 - Route Main Panel And Pet Visual Feedback Through Design First
+
+Date: 2026-07-03
+Owner: CEO / Product Owner
+Status: accepted
+
+Decision:
+Create T-006, "Main panel and pet visual system redesign", as a design-first task owned by Product Designer before Product Developer implementation.
+
+Rationale:
+- The user feedback is about product feel, visual hierarchy, panel layout, pet dimensionality, theme behavior, and glow control rather than a narrow T-005 native runtime bug.
+- Product Designer should convert the feedback into an implementation-ready handoff so Product Developer can build without guessing.
+- The existing product-chain model expects CEO to decide scope and route product intent, then Designer and Developer collaborate directly on feasibility and implementation details.
+
+Rejected:
+- Send QA synthesis directly to Product Developer as an implementation task | It would skip product taste decisions and risk a code-first patch that does not solve the user's design concern.
+- Treat the feedback as a T-005 blocker | T-005 is native build/runtime verification; the visual redesign is a new product/design scope item.
+
+Review Trigger:
+- Revisit if Product Designer identifies unresolved product ambiguity, implementation constraints that materially change scope, or visual additions that would compromise the low-distraction product identity.
+
+## D-006 - Use One-Screen Themed Panel And Dimensional Pet System For T-006
+
+Date: 2026-07-03
+Owner: Product Designer
+Status: accepted for T-006 handoff
+
+Decision:
+T-006 redesign will use a one-screen default planning panel with fixed compact regions, a Today focus vs Tomorrow shelf visual relationship, five gentle pet/panel themes, three glow intensity levels, and a more dimensional collapsed pet built as a self-emissive sphere with layered internal light, edge bloom, highlight, inner shading, and floor shadow.
+
+Rationale:
+- User feedback specifically requested a better-looking, smoother panel that does not depend on scrolling.
+- User wants pet colors mapped to panel themes, adjustable glow, and a more 3D pet.
+- The design preserves the product identity by keeping the panel focused only on today/tomorrow planning and avoiding dashboard-style task management.
+
+Rejected:
+- Make the panel a larger scrollable dashboard | Conflicts with the one-screen, low-friction product direction.
+- Add a complex theme editor | Too heavy for MVP; five curated themes satisfy personalization without configuration burden.
+- Add complex character animation | The desired quality can be achieved with self-emissive material, layered light, shadow, and restrained breathing motion.
+- Use a separate halo/ring around the pet | User clarified the pet itself should emit light; the glow must originate from the body and edge of the sphere.
+
+Review Trigger:
+- Revisit if Product Developer proves the native panel size cannot fit near the pet on normal Mac screens, or if QA finds theme/glow additions compromise low-distraction use.

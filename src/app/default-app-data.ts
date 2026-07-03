@@ -22,7 +22,10 @@ export function createDefaultAppData(localDate = toLocalDateKey(new Date())): Ap
       stage: "spark",
       completedTaskCount: 0,
       eveningReviewCount: 0,
-      eveningReviewStreak: 0
+      eveningReviewStreak: 0,
+      recordedTaskCount: 0,
+      tomorrowCatchCount: 0,
+      coDoSessionCount: 0
     },
     settings: defaultSettings
   };

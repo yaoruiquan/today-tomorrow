@@ -2,7 +2,7 @@ import React from "react";
 import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { clearAppData, loadAppData, saveAppData } from "./app-storage";
-import { completeEveningReviewState, useAppModel } from "./app-model";
+import { completeEveningReviewState, getGentleReminderCandidate, useAppModel } from "./app-model";
 import { createDefaultAppData } from "./default-app-data";
 
 describe("app storage", () => {
@@ -15,6 +15,12 @@ describe("app storage", () => {
 
     expect(data.tasks).toEqual([]);
     expect(data.settings.workdayEndTime).toBe("18:00");
+    expect(data.settings.petThemeId).toBe("warmGlow");
+    expect(data.settings.glowIntensity).toBe("soft");
+    expect(data.settings.catchTomorrowEnabled).toBe(true);
+    expect(data.settings.gentleRemindersEnabled).toBe(true);
+    expect(data.settings.hoverInteractionEnabled).toBe(true);
+    expect(data.settings.quietMode.mode).toBe("off");
     expect(data.dayCycle.lastOpenedLocalDate).toBe("2026-07-03");
     expect(data.pet.panelOpen).toBe(false);
     expect(data.panel.open).toBe(false);
@@ -33,6 +39,18 @@ describe("app storage", () => {
 
     expect(loaded.pet.panelOpen).toBe(false);
     expect(loaded.panel.open).toBe(false);
+  });
+
+  it("does not restore transient pet messages on load", () => {
+    const data = createDefaultAppData("2026-07-03");
+    saveAppData({
+      ...data,
+      pet: { ...data.pet, lastMessage: "我回来了。" }
+    });
+
+    const loaded = loadAppData(createDefaultAppData("2026-07-03"));
+
+    expect(loaded.pet.lastMessage).toBeUndefined();
   });
 });
 
@@ -100,5 +118,85 @@ describe("app model", () => {
 
     expect(secondReview.growth.eveningReviewCount).toBe(1);
     expect(secondReview.growth.eveningReviewStreak).toBe(1);
+  });
+
+  it("updates theme and glow preferences without changing tasks", () => {
+    render(React.createElement(ModelProbe));
+
+    act(() => readModel().addTaskToBucket("保留任务", "today"));
+    const taskId = readModel().todayTasks[0].id;
+
+    act(() => readModel().setPetThemeId("blueNight"));
+    act(() => readModel().setGlowIntensity("bright"));
+
+    expect(readModel().data.settings.petThemeId).toBe("blueNight");
+    expect(readModel().data.settings.glowIntensity).toBe("bright");
+    expect(readModel().todayTasks).toHaveLength(1);
+    expect(readModel().todayTasks[0]).toMatchObject({
+      id: taskId,
+      title: "保留任务",
+      bucket: "today",
+      status: "open"
+    });
+  });
+
+  it("does not catch today tasks until the user confirms", () => {
+    render(React.createElement(ModelProbe));
+
+    act(() => readModel().addTaskToBucket("需要被接住", "today"));
+    act(() => readModel().setCatchTomorrowEnabled(false));
+
+    expect(readModel().todayOpenCount).toBe(1);
+    expect(readModel().tomorrowOpenCount).toBe(0);
+
+    act(() => readModel().setCatchTomorrowEnabled(true));
+
+    expect(readModel().todayOpenCount).toBe(1);
+    expect(readModel().tomorrowOpenCount).toBe(0);
+
+    act(() => readModel().catchTodayTasksForTomorrow());
+
+    expect(readModel().todayOpenCount).toBe(0);
+    expect(readModel().tomorrowOpenCount).toBe(1);
+    expect(readModel().data.growth.tomorrowCatchCount).toBe(1);
+  });
+
+  it("keeps only one active co-do task and clears it on completion", () => {
+    render(React.createElement(ModelProbe));
+
+    act(() => readModel().addTaskToBucket("第一件", "today"));
+    act(() => readModel().addTaskToBucket("第二件", "today"));
+
+    const firstId = readModel().todayTasks[1].id;
+    const secondId = readModel().todayTasks[0].id;
+
+    act(() => readModel().startCoDoTask(firstId));
+    expect(readModel().data.pet.activeCoDoTaskId).toBe(firstId);
+
+    act(() => readModel().startCoDoTask(secondId));
+    expect(readModel().data.pet.activeCoDoTaskId).toBe(secondId);
+
+    act(() => readModel().toggleTask(secondId));
+    expect(readModel().data.pet.activeCoDoTaskId).toBeUndefined();
+  });
+
+  it("suppresses gentle reminders while quiet mode is active", () => {
+    const data = {
+      ...createDefaultAppData("2026-07-03"),
+      tasks: [
+        {
+          id: "task-1",
+          title: "安静收尾",
+          bucket: "today" as const,
+          status: "open" as const,
+          createdAt: "2026-07-03T08:00:00.000Z",
+          updatedAt: "2026-07-03T08:00:00.000Z"
+        }
+      ]
+    };
+    const evening = new Date(2026, 6, 3, 19, 0);
+
+    expect(getGentleReminderCandidate(data, evening, false)?.reason).toBe("eveningCatch");
+    expect(getGentleReminderCandidate(data, evening, true)).toBeUndefined();
   });
 });

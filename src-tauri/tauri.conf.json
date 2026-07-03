@@ -10,6 +10,7 @@
     "beforeBuildCommand": "pnpm build"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "pet",
@@ -22,15 +23,16 @@
         "decorations": false,
         "alwaysOnTop": true,
         "visibleOnAllWorkspaces": true,
-        "transparent": false,
+        "transparent": true,
+        "shadow": false,
         "skipTaskbar": true
       },
       {
         "label": "panel",
         "title": "今天明天",
         "url": "index.html?window=panel",
-        "width": 760,
-        "height": 540,
+        "width": 560,
+        "height": 600,
         "resizable": false,
         "fullscreen": false,
         "decorations": false,

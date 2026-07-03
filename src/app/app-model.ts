@@ -7,12 +7,19 @@ import {
   openTodayTasks
 } from "../features/evening-review/evening-review-flow";
 import { eveningReviewCopy } from "../features/evening-review/evening-review-copy";
-import { getGrowthStage } from "../features/growth/growth-rules";
+import { getGrowthStageFromState } from "../features/growth/growth-rules";
+import type { GrowthState } from "../features/growth/growth-types";
 import { getBasePetMood, type PetMood } from "../features/pet/pet-mood";
-import { isEveningByTime } from "../features/settings/settings-store";
+import { isEveningByTime, isQuietModeActive, quietModeUntil } from "../features/settings/settings-store";
+import type {
+  DesktopPlacementId,
+  GlowIntensity,
+  PetThemeId,
+  QuietModeId
+} from "../features/settings/settings-types";
 import { abandonTask, addTask, moveTask, toggleTaskDone } from "../features/tasks/task-reducer";
 import { openTaskCount, tasksInBucket } from "../features/tasks/task-selectors";
-import type { TaskBucket } from "../features/tasks/task-types";
+import type { Task, TaskBucket } from "../features/tasks/task-types";
 import { createId } from "../shared/lib/ids";
 import { createDefaultAppData } from "./default-app-data";
 import {
@@ -35,6 +42,10 @@ interface AppModel {
   tomorrowOpenCount: number;
   displayMood: PetMood;
   isEvening: boolean;
+  quietModeActive: boolean;
+  gentleReminderMessage?: string;
+  gentleReminderActive: boolean;
+  activeCoDoTask?: Task;
   todayTasks: ReturnType<typeof tasksInBucket>;
   tomorrowTasks: ReturnType<typeof tasksInBucket>;
   reviewTasks: ReturnType<typeof openTodayTasks>;
@@ -50,12 +61,32 @@ interface AppModel {
   togglePanel: () => void;
   setPanelOpen: (open: boolean) => void;
   setPetPosition: (position: PetPosition) => void;
+  setPetThemeId: (themeId: PetThemeId) => void;
+  setGlowIntensity: (intensity: GlowIntensity) => void;
+  setCatchTomorrowEnabled: (enabled: boolean) => void;
+  setGentleRemindersEnabled: (enabled: boolean) => void;
+  setHoverInteractionEnabled: (enabled: boolean) => void;
+  setQuietMode: (mode: QuietModeId) => void;
+  setDesktopPlacement: (placement: DesktopPlacementId) => void;
+  startCoDoTask: (id: string) => void;
+  stopCoDoTask: () => void;
+  catchTodayTasksForTomorrow: () => void;
+  markGentleReminderShown: (message: string) => void;
   showMessage: (message: string, mood?: PetMood) => void;
 }
 
 interface PreparedAppData {
   data: AppData;
   changed: boolean;
+}
+
+const GENTLE_REMINDER_CAP_MS = 60 * 60 * 1000;
+const GENTLE_REMINDER_VISIBLE_MS = 10 * 60 * 1000;
+const CO_DO_CHECK_IN_MS = 45 * 60 * 1000;
+
+interface GentleReminderCandidate {
+  message: string;
+  reason: "emptyToday" | "eveningCatch" | "coDoCheckIn";
 }
 
 export function completeEveningReviewState(
@@ -69,6 +100,13 @@ export function completeEveningReviewState(
   const nextReviewCount = alreadyCompletedToday
     ? current.growth.eveningReviewCount
     : current.growth.eveningReviewCount + 1;
+  const nextGrowth = withGrowthStage({
+    ...current.growth,
+    eveningReviewCount: nextReviewCount,
+    eveningReviewStreak: alreadyCompletedToday
+      ? current.growth.eveningReviewStreak
+      : current.growth.eveningReviewStreak + 1
+  });
 
   return {
     ...current,
@@ -80,20 +118,74 @@ export function completeEveningReviewState(
       ...current.panel,
       mode: "tasks"
     },
-    growth: {
-      ...current.growth,
-      eveningReviewCount: nextReviewCount,
-      eveningReviewStreak: alreadyCompletedToday
-        ? current.growth.eveningReviewStreak
-        : current.growth.eveningReviewStreak + 1,
-      stage: getGrowthStage(nextReviewCount)
-    },
+    growth: nextGrowth,
     pet: {
       ...current.pet,
       mood: "happy",
       lastMessage: input.message
     }
   };
+}
+
+export function withGrowthStage(growth: GrowthState): GrowthState {
+  return {
+    ...growth,
+    stage: getGrowthStageFromState(growth)
+  };
+}
+
+export function getGentleReminderCandidate(
+  data: AppData,
+  now: Date = new Date(),
+  quietModeActive = isQuietModeActive(data.settings.quietMode, now)
+): GentleReminderCandidate | undefined {
+  if (!data.settings.gentleRemindersEnabled || quietModeActive) return undefined;
+
+  if (data.pet.lastGentleReminderAt) {
+    const lastReminderAt = new Date(data.pet.lastGentleReminderAt);
+    if (!Number.isNaN(lastReminderAt.getTime()) && now.getTime() - lastReminderAt.getTime() < GENTLE_REMINDER_CAP_MS) {
+      return undefined;
+    }
+  }
+
+  const todayOpen = openTaskCount(data.tasks, "today");
+
+  if (data.pet.activeCoDoTaskId && data.settings.coDoCheckInEnabled && data.pet.coDoStartedAt) {
+    const coDoStartedAt = new Date(data.pet.coDoStartedAt);
+    if (!Number.isNaN(coDoStartedAt.getTime()) && now.getTime() - coDoStartedAt.getTime() >= CO_DO_CHECK_IN_MS) {
+      return {
+        reason: "coDoCheckIn",
+        message: "还陪你在这件事上。"
+      };
+    }
+  }
+
+  if (isEveningByTime(now, data.settings.workdayEndTime) && todayOpen > 0 && data.settings.catchTomorrowEnabled) {
+    return {
+      reason: "eveningCatch",
+      message: `还有 ${todayOpen} 件，我可以轻轻接到明天。`
+    };
+  }
+
+  if (todayOpen === 0 && now.getHours() >= 10 && now.getHours() < 18) {
+    return {
+      reason: "emptyToday",
+      message: "今天可以先放一件很小的事。"
+    };
+  }
+
+  return undefined;
+}
+
+function recentGentleReminderMessage(data: AppData, now: Date): string | undefined {
+  if (!data.pet.lastGentleReminderAt || !data.pet.lastGentleReminderMessage) return undefined;
+
+  const lastReminderAt = new Date(data.pet.lastGentleReminderAt);
+  if (Number.isNaN(lastReminderAt.getTime())) return undefined;
+
+  return now.getTime() - lastReminderAt.getTime() <= GENTLE_REMINDER_VISIBLE_MS
+    ? data.pet.lastGentleReminderMessage
+    : undefined;
 }
 
 export function prepareAppDataForToday(
@@ -136,7 +228,8 @@ export function prepareAppDataForToday(
 export function useAppModel(): AppModel {
   const [data, setData] = useState<AppData>(() => {
     const today = toLocalDateKey(new Date());
-    const loaded = loadAppData(createDefaultAppData(today));
+    const fallback = createDefaultAppData(today);
+    const loaded = canUseNativeAppData() ? fallback : loadAppData(fallback);
     return prepareAppDataForToday(loaded, today).data;
   });
   const moodTimer = useRef<number | undefined>(undefined);
@@ -212,10 +305,16 @@ export function useAppModel(): AppModel {
 
   const now = new Date();
   const isEvening = isEveningByTime(now, data.settings.workdayEndTime);
+  const quietModeActive = isQuietModeActive(data.settings.quietMode, now);
   const todayOpenCount = openTaskCount(data.tasks, "today");
   const tomorrowOpenCount = openTaskCount(data.tasks, "tomorrow");
   const baseMood = getBasePetMood({ openTodayCount: todayOpenCount, isEvening });
   const displayMood = data.pet.mood === "happy" ? "happy" : baseMood;
+  const activeCoDoTask = data.pet.activeCoDoTaskId
+    ? data.tasks.find((task) => task.id === data.pet.activeCoDoTaskId && task.status === "open")
+    : undefined;
+  const gentleReminderMessage = quietModeActive ? undefined : recentGentleReminderMessage(data, now);
+  const gentleReminderActive = Boolean(gentleReminderMessage);
 
   const model = useMemo(
     () => ({
@@ -229,6 +328,30 @@ export function useAppModel(): AppModel {
   function update(updater: (current: AppData) => AppData): void {
     setData((current) => updater(current));
   }
+
+  useEffect(() => {
+    if (!storageHydrated.current) return;
+
+    const now = new Date();
+    const reminder = getGentleReminderCandidate(data, now, quietModeActive);
+    if (!reminder) return;
+
+    const nowIso = now.toISOString();
+    setData((current) => {
+      const currentQuietModeActive = isQuietModeActive(current.settings.quietMode, now);
+      const currentReminder = getGentleReminderCandidate(current, now, currentQuietModeActive);
+      if (!currentReminder) return current;
+
+      return {
+        ...current,
+        pet: {
+          ...current.pet,
+          lastGentleReminderAt: nowIso,
+          lastGentleReminderMessage: currentReminder.message
+        }
+      };
+    });
+  }, [data, quietModeActive]);
 
   function scheduleBaseMoodReset(): void {
     if (moodTimer.current) window.clearTimeout(moodTimer.current);
@@ -290,6 +413,10 @@ export function useAppModel(): AppModel {
         bucket,
         now: nowIso
       }),
+      growth: withGrowthStage({
+        ...current.growth,
+        recordedTaskCount: current.growth.recordedTaskCount + 1
+      }),
       pet: {
         ...current.pet,
         lastMessage: bucket === "today" ? "放进今天了。" : "明天会接住它。"
@@ -304,11 +431,16 @@ export function useAppModel(): AppModel {
 
     update((current) => {
       const nextGrowth = willComplete
-        ? {
+        ? withGrowthStage({
             ...current.growth,
             completedTaskCount: current.growth.completedTaskCount + 1
-          }
+          })
         : current.growth;
+      const taskBeingToggled = current.tasks.find((item) => item.id === id);
+      const shouldStopCoDo =
+        willComplete &&
+        current.pet.activeCoDoTaskId === id &&
+        taskBeingToggled?.status === "open";
 
       const next = {
         ...current,
@@ -316,8 +448,14 @@ export function useAppModel(): AppModel {
         growth: nextGrowth,
         pet: {
           ...current.pet,
+          activeCoDoTaskId: shouldStopCoDo ? undefined : current.pet.activeCoDoTaskId,
+          coDoStartedAt: shouldStopCoDo ? undefined : current.pet.coDoStartedAt,
           mood: willComplete ? "happy" : current.pet.mood,
-          lastMessage: willComplete ? "完成得很安静。" : "重新放回视线里。"
+          lastMessage: willComplete
+            ? shouldStopCoDo
+              ? "这件事已经被轻轻完成。"
+              : "完成得很安静。"
+            : "重新放回视线里。"
         }
       };
 
@@ -337,6 +475,8 @@ export function useAppModel(): AppModel {
         tasks: moveTask(current.tasks, id, bucket, nowIso),
         pet: {
           ...current.pet,
+          activeCoDoTaskId: current.pet.activeCoDoTaskId === id ? undefined : current.pet.activeCoDoTaskId,
+          coDoStartedAt: current.pet.activeCoDoTaskId === id ? undefined : current.pet.coDoStartedAt,
           lastMessage: bucket === "tomorrow" ? "交给明天。" : "今天继续。"
         }
       };
@@ -353,6 +493,8 @@ export function useAppModel(): AppModel {
         tasks: abandonTask(current.tasks, id, nowIso),
         pet: {
           ...current.pet,
+          activeCoDoTaskId: current.pet.activeCoDoTaskId === id ? undefined : current.pet.activeCoDoTaskId,
+          coDoStartedAt: current.pet.activeCoDoTaskId === id ? undefined : current.pet.coDoStartedAt,
           lastMessage: "这件事已经放下。"
         }
       };
@@ -434,20 +576,34 @@ export function useAppModel(): AppModel {
   }
 
   function moveAllOpenTodayToTomorrow(): void {
+    catchTodayTasksForTomorrow();
+  }
+
+  function catchTodayTasksForTomorrow(): void {
     const nowIso = new Date().toISOString();
     const localDate = toLocalDateKey(new Date());
-    update((current) =>
-      completeEveningReviewState(
+    update((current) => {
+      const openTodayCount = openTodayTasks(current.tasks).length;
+      const nextGrowth =
+        openTodayCount > 0
+          ? withGrowthStage({
+              ...current.growth,
+              tomorrowCatchCount: current.growth.tomorrowCatchCount + 1
+            })
+          : current.growth;
+
+      return completeEveningReviewState(
         {
           ...current,
-          tasks: moveOpenTodayTasksToTomorrow(current.tasks, nowIso)
+          tasks: moveOpenTodayTasksToTomorrow(current.tasks, nowIso),
+          growth: nextGrowth
         },
         {
           localDate,
           message: "明天已经接住了。"
         }
-      )
-    );
+      );
+    });
     scheduleBaseMoodReset();
   }
 
@@ -461,12 +617,150 @@ export function useAppModel(): AppModel {
     }));
   }
 
+  function setPetThemeId(themeId: PetThemeId): void {
+    update((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        petThemeId: themeId
+      }
+    }));
+  }
+
+  function setGlowIntensity(intensity: GlowIntensity): void {
+    update((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        glowIntensity: intensity
+      }
+    }));
+  }
+
+  function setCatchTomorrowEnabled(enabled: boolean): void {
+    update((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        catchTomorrowEnabled: enabled
+      },
+      pet: {
+        ...current.pet,
+        lastMessage: enabled ? "我可以接住明天。" : "今天先留在这里。"
+      }
+    }));
+  }
+
+  function setGentleRemindersEnabled(enabled: boolean): void {
+    update((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        gentleRemindersEnabled: enabled
+      },
+      pet: {
+        ...current.pet,
+        lastMessage: enabled ? "我会轻轻提醒。" : "我会更安静。"
+      }
+    }));
+  }
+
+  function setHoverInteractionEnabled(enabled: boolean): void {
+    update((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        hoverInteractionEnabled: enabled
+      }
+    }));
+  }
+
+  function setQuietMode(mode: QuietModeId): void {
+    update((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        quietMode: {
+          mode,
+          until: quietModeUntil(mode)
+        }
+      },
+      pet: {
+        ...current.pet,
+        lastMessage: mode === "off" ? "我又轻轻亮起来了。" : "我会安静陪着。"
+      }
+    }));
+  }
+
+  function setDesktopPlacement(placement: DesktopPlacementId): void {
+    update((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        desktopPlacement: placement
+      }
+    }));
+  }
+
+  function startCoDoTask(id: string): void {
+    const nowIso = new Date().toISOString();
+    update((current) => {
+      const task = current.tasks.find((item) => item.id === id);
+      if (!task || task.status !== "open") return current;
+
+      return {
+        ...current,
+        growth: withGrowthStage({
+          ...current.growth,
+          coDoSessionCount:
+            current.pet.activeCoDoTaskId === id
+              ? current.growth.coDoSessionCount
+              : current.growth.coDoSessionCount + 1
+        }),
+        pet: {
+          ...current.pet,
+          activeCoDoTaskId: id,
+          coDoStartedAt: nowIso,
+          lastMessage: "我陪你做这件。"
+        }
+      };
+    });
+  }
+
+  function stopCoDoTask(): void {
+    update((current) => ({
+      ...current,
+      pet: {
+        ...current.pet,
+        activeCoDoTaskId: undefined,
+        coDoStartedAt: undefined,
+        lastMessage: "先停在这里也可以。"
+      }
+    }));
+  }
+
+  function markGentleReminderShown(message: string): void {
+    const nowIso = new Date().toISOString();
+    update((current) => ({
+      ...current,
+      pet: {
+        ...current.pet,
+        lastGentleReminderAt: nowIso,
+        lastGentleReminderMessage: message
+      }
+    }));
+  }
+
   return {
     data,
     todayOpenCount,
     tomorrowOpenCount,
     displayMood,
     isEvening,
+    quietModeActive,
+    gentleReminderMessage,
+    gentleReminderActive,
+    activeCoDoTask,
     ...model,
     addTaskToBucket,
     toggleTask,
@@ -480,6 +774,17 @@ export function useAppModel(): AppModel {
     togglePanel,
     setPanelOpen,
     setPetPosition,
+    setPetThemeId,
+    setGlowIntensity,
+    setCatchTomorrowEnabled,
+    setGentleRemindersEnabled,
+    setHoverInteractionEnabled,
+    setQuietMode,
+    setDesktopPlacement,
+    startCoDoTask,
+    stopCoDoTask,
+    catchTodayTasksForTomorrow,
+    markGentleReminderShown,
     showMessage
   };
 }

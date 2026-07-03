@@ -10,7 +10,7 @@ struct AppDataChangedPayload {
   source_id: Option<String>,
 }
 
-fn app_data_file(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn app_data_file(app: &AppHandle) -> Result<PathBuf, String> {
   let dir = app.path().app_data_dir().map_err(|error| error.to_string())?;
   fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
   Ok(dir.join(APP_DATA_FILE))

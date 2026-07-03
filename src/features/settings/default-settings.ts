@@ -5,5 +5,15 @@ export const defaultSettings: Settings = {
   alwaysOnTop: true,
   visibleOnAllWorkspaces: true,
   launchAtLogin: false,
-  reducedMotion: false
+  reducedMotion: false,
+  petThemeId: "warmGlow",
+  glowIntensity: "soft",
+  catchTomorrowEnabled: true,
+  gentleRemindersEnabled: true,
+  hoverInteractionEnabled: true,
+  coDoCheckInEnabled: true,
+  quietMode: {
+    mode: "off"
+  },
+  desktopPlacement: "bottomRight"
 };
