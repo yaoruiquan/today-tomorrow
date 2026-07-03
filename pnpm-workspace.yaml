@@ -1,0 +1,11 @@
+packages:
+  - .
+
+overrides:
+  baseline-browser-mapping: 2.8.31
+  browserslist: 4.25.1
+  electron-to-chromium: 1.5.203
+  picomatch: 4.0.3
+
+allowBuilds:
+  esbuild: true

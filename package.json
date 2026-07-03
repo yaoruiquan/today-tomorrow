@@ -1,0 +1,52 @@
+{
+  "name": "today-tomorrow",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A gentle Mac desktop pet for today/tomorrow task notes and evening review.",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yaoruiquan/today-tomorrow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yaoruiquan/today-tomorrow/issues"
+  },
+  "homepage": "https://github.com/yaoruiquan/today-tomorrow#readme",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "package:macos": "tauri build"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.11.1",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.36.0",
+    "@tauri-apps/cli": "2.11.4",
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/jest-dom": "6.8.0",
+    "@testing-library/react": "16.3.0",
+    "@types/react": "19.1.13",
+    "@types/react-dom": "19.1.9",
+    "@vitejs/plugin-react": "4.6.0",
+    "eslint": "9.36.0",
+    "eslint-plugin-react-hooks": "5.2.0",
+    "jsdom": "26.1.0",
+    "playwright": "1.55.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.44.1",
+    "vite": "6.3.5",
+    "vitest": "3.1.4"
+  }
+}

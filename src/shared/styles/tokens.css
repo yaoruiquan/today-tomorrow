@@ -1,0 +1,22 @@
+:root {
+  --paper: #f8f6f0;
+  --paper-soft: #fffcf5;
+  --ink: #242824;
+  --muted: #737a70;
+  --line: rgba(52, 64, 51, 0.12);
+  --sage: #b8c7ad;
+  --sage-deep: #66836a;
+  --sky: #cfe7ed;
+  --sun: #f4d37b;
+  --clay: #d49c83;
+  --white: rgba(255, 255, 255, 0.82);
+  --shadow: 0 26px 70px rgba(65, 72, 61, 0.16);
+  color-scheme: light;
+  font-family:
+    ui-rounded,
+    "Hiragino Sans GB",
+    "PingFang SC",
+    "Avenir Next",
+    "Helvetica Neue",
+    sans-serif;
+}

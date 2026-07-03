@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>今天明天 · 小光团原型</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='%23f4d37b'/%3E%3Ccircle cx='24' cy='34' r='3' fill='%23242824'/%3E%3Ccircle cx='40' cy='34' r='3' fill='%23242824'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="desktop" aria-label="今天明天桌面原型">
+      <section class="workspace" aria-label="任务工作区">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">今天明天</p>
+            <h1>把今天收好，把明天放稳。</h1>
+          </div>
+          <button class="icon-button" id="togglePanel" aria-label="切换任务面板" title="切换任务面板">
+            <span aria-hidden="true">⌘</span>
+          </button>
+        </header>
+
+        <section class="task-panel" id="taskPanel" aria-label="今天和明天">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker" id="dateLabel"></p>
+              <h2>今天 / 明天</h2>
+            </div>
+            <button class="quiet-button" id="reviewDay">下班整理</button>
+          </div>
+
+          <form class="quick-add" id="quickAdd">
+            <input
+              id="taskInput"
+              name="task"
+              type="text"
+              autocomplete="off"
+              placeholder="写下一件事"
+              aria-label="新增任务"
+            />
+            <div class="segmented" role="radiogroup" aria-label="任务日期">
+              <label>
+                <input type="radio" name="bucket" value="today" checked />
+                <span>今天</span>
+              </label>
+              <label>
+                <input type="radio" name="bucket" value="tomorrow" />
+                <span>明天</span>
+              </label>
+            </div>
+            <button class="add-button" type="submit" aria-label="添加任务">＋</button>
+          </form>
+
+          <div class="columns">
+            <section class="task-column" aria-labelledby="todayTitle">
+              <div class="column-head">
+                <h3 id="todayTitle">今天</h3>
+                <span class="counter" id="todayCount">0</span>
+              </div>
+              <ul class="task-list" id="todayList"></ul>
+            </section>
+
+            <section class="task-column" aria-labelledby="tomorrowTitle">
+              <div class="column-head">
+                <h3 id="tomorrowTitle">明天</h3>
+                <span class="counter" id="tomorrowCount">0</span>
+              </div>
+              <ul class="task-list" id="tomorrowList"></ul>
+            </section>
+          </div>
+        </section>
+      </section>
+
+      <button class="pet" id="pet" aria-label="小光团" title="小光团">
+        <span class="pet-aura" aria-hidden="true"></span>
+        <span class="pet-body" aria-hidden="true">
+          <span class="pet-face">
+            <span></span>
+            <span></span>
+          </span>
+        </span>
+        <span class="pet-shadow" aria-hidden="true"></span>
+      </button>
+
+      <aside class="pet-note" id="petNote" aria-live="polite"></aside>
+    </main>
+
+    <dialog class="review-dialog" id="reviewDialog" aria-labelledby="reviewTitle">
+      <form method="dialog">
+        <p class="panel-kicker">收尾</p>
+        <h2 id="reviewTitle">今天还有一些事没有落地</h2>
+        <p class="review-copy" id="reviewCopy"></p>
+        <div class="review-actions">
+          <button value="cancel" class="quiet-button">先放着</button>
+          <button value="move" class="primary-button" id="moveAll">移到明天</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>
