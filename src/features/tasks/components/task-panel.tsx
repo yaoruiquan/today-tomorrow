@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AppModelSnapshot } from "./task-panel-types";
 import { toLocalDateKey } from "../../day-cycle/local-date";
 import { placePetWindow, recenterPetWindow } from "../../desktop-shell/window-events";
@@ -6,7 +6,6 @@ import { EveningReviewDialog } from "../../evening-review/components/evening-rev
 import { glowIntensityOptions, petThemeOptions } from "../../settings/theme-options";
 import type { DesktopPlacementId, QuietModeId } from "../../settings/settings-types";
 import type { TaskBucket } from "../task-types";
-import { QuickAdd } from "./quick-add";
 import { TaskColumn } from "./task-column";
 
 interface TaskPanelProps {
@@ -16,6 +15,9 @@ interface TaskPanelProps {
 
 export function TaskPanel({ model, compact = false }: TaskPanelProps) {
   const [catchSuggestionDismissed, setCatchSuggestionDismissed] = useState(false);
+  const [catchFeedbackCount, setCatchFeedbackCount] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const catchFeedbackTimer = useRef<number | undefined>(undefined);
   const dateLabel = new Intl.DateTimeFormat("zh-CN", {
     month: "long",
     day: "numeric",
@@ -35,6 +37,7 @@ export function TaskPanel({ model, compact = false }: TaskPanelProps) {
     model.isEvening &&
     model.todayOpenCount > 0 &&
     !catchSuggestionDismissed;
+  const catchFeedbackVisible = catchFeedbackCount > 0;
   const companionMessage = getCompanionMessage({
     quietModeActive: model.quietModeActive,
     activeCoDoTitle,
@@ -45,6 +48,40 @@ export function TaskPanel({ model, compact = false }: TaskPanelProps) {
   useEffect(() => {
     setCatchSuggestionDismissed(false);
   }, [model.todayOpenCount, model.data.settings.catchTomorrowEnabled]);
+
+  useEffect(() => {
+    return () => {
+      if (catchFeedbackTimer.current) window.clearTimeout(catchFeedbackTimer.current);
+    };
+  }, []);
+
+  function showCaughtFeedback(count: number) {
+    if (catchFeedbackTimer.current) window.clearTimeout(catchFeedbackTimer.current);
+
+    setCatchFeedbackCount(count);
+    catchFeedbackTimer.current = window.setTimeout(() => {
+      setCatchFeedbackCount(0);
+      catchFeedbackTimer.current = undefined;
+    }, 2600);
+  }
+
+  function handleCatchTodayTasksForTomorrow() {
+    const caughtCount = model.todayOpenCount;
+    if (caughtCount <= 0) return;
+
+    setCatchSuggestionDismissed(true);
+    showCaughtFeedback(caughtCount);
+    model.catchTodayTasksForTomorrow();
+  }
+
+  function handleDismissCatchSuggestion() {
+    setCatchSuggestionDismissed(true);
+    model.showMessage("好，我先不动它们。");
+  }
+
+  function handleEmptyColumnAdd(bucket: TaskBucket) {
+    model.showMessage(bucket === "today" ? "先写下一件今天的事。" : "先写下一件明天的事。");
+  }
 
   async function returnPetToScreen() {
     const didRecenter = await recenterPetWindow();
@@ -102,39 +139,15 @@ export function TaskPanel({ model, compact = false }: TaskPanelProps) {
         </div>
       </header>
 
-      <QuickAdd onAdd={model.addTaskToBucket} />
-
       <section
         className="companion-strip"
         data-reminder-active={model.gentleReminderActive ? "true" : undefined}
-        aria-label="小光团能力"
+        aria-label="小光团状态"
       >
         <p>{companionMessage}</p>
-        <div className="ability-toggles" aria-label="能力开关">
-          <label>
-            <input
-              type="checkbox"
-              checked={model.data.settings.catchTomorrowEnabled}
-              onChange={(event) => model.setCatchTomorrowEnabled(event.currentTarget.checked)}
-            />
-            <span>接住明天</span>
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={model.data.settings.gentleRemindersEnabled}
-              onChange={(event) => model.setGentleRemindersEnabled(event.currentTarget.checked)}
-            />
-            <span>轻声提醒</span>
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={model.data.settings.hoverInteractionEnabled}
-              onChange={(event) => model.setHoverInteractionEnabled(event.currentTarget.checked)}
-            />
-            <span>靠近回应</span>
-          </label>
+        <div className="companion-status" aria-label="陪伴状态">
+          {activeCoDoTitle ? <span>陪做中</span> : null}
+          {model.quietModeActive ? <span>安静中</span> : null}
         </div>
       </section>
 
@@ -147,6 +160,8 @@ export function TaskPanel({ model, compact = false }: TaskPanelProps) {
           openCount={model.todayOpenCount}
           tasks={model.todayTasks}
           activeCoDoTaskId={model.data.pet.activeCoDoTaskId}
+          onAdd={model.addTaskToBucket}
+          onEmptySubmit={handleEmptyColumnAdd}
           onToggle={model.toggleTask}
           onMove={(id: string, bucket: TaskBucket) => model.moveTaskToBucket(id, bucket)}
           onStartCoDo={model.startCoDoTask}
@@ -160,6 +175,9 @@ export function TaskPanel({ model, compact = false }: TaskPanelProps) {
           openCount={model.tomorrowOpenCount}
           tasks={model.tomorrowTasks}
           activeCoDoTaskId={model.data.pet.activeCoDoTaskId}
+          receiving={catchFeedbackVisible}
+          onAdd={model.addTaskToBucket}
+          onEmptySubmit={handleEmptyColumnAdd}
           onToggle={model.toggleTask}
           onMove={(id: string, bucket: TaskBucket) => model.moveTaskToBucket(id, bucket)}
           onStartCoDo={model.startCoDoTask}
@@ -168,7 +186,17 @@ export function TaskPanel({ model, compact = false }: TaskPanelProps) {
       </div>
 
       <section className="evening-strip" aria-label="下班整理">
-        {catchSuggestionVisible ? (
+        {catchFeedbackVisible ? (
+          <>
+            <div>
+              <span className="review-chip">{`已接住 +${catchFeedbackCount}`}</span>
+              <p>我接住了，明天还在。</p>
+            </div>
+            <button className="quiet-button evening-action" type="button" onClick={model.startEveningReview}>
+              下班整理
+            </button>
+          </>
+        ) : catchSuggestionVisible ? (
           <>
             <div>
               <span className="review-chip">{reviewStatus}</span>
@@ -178,14 +206,14 @@ export function TaskPanel({ model, compact = false }: TaskPanelProps) {
               <button
                 className="primary-button compact-action"
                 type="button"
-                onClick={model.catchTodayTasksForTomorrow}
+                onClick={handleCatchTodayTasksForTomorrow}
               >
                 接住明天
               </button>
               <button
                 className="quiet-button compact-action"
                 type="button"
-                onClick={() => setCatchSuggestionDismissed(true)}
+                onClick={handleDismissCatchSuggestion}
               >
                 先留在今天
               </button>
@@ -204,7 +232,7 @@ export function TaskPanel({ model, compact = false }: TaskPanelProps) {
         )}
       </section>
 
-      <footer className="panel-footer-controls" aria-label="外观和恢复">
+      <footer className="panel-footer-controls" aria-label="外观和设置">
         <div className="theme-swatches" aria-label="小光团主题">
           {petThemeOptions.map((theme) => (
             <button
@@ -235,39 +263,93 @@ export function TaskPanel({ model, compact = false }: TaskPanelProps) {
           ))}
         </div>
 
-        <select
-          className="quiet-select"
-          aria-label="安静模式"
-          value={quietModeValue}
-          onChange={(event) => model.setQuietMode(event.currentTarget.value as QuietModeId)}
-        >
-          <option value="off">安静关闭</option>
-          <option value="oneHour">1 小时</option>
-          <option value="untilTomorrow">到明天</option>
-          <option value="always">一直开启</option>
-        </select>
+        <div className="settings-popover-wrap">
+          <button
+            className="settings-toggle"
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={settingsOpen}
+            onClick={() => setSettingsOpen((open) => !open)}
+          >
+            设置
+          </button>
 
-        <select
-          className="placement-select"
-          aria-label="小光团位置"
-          value={model.data.settings.desktopPlacement}
-          onChange={(event) => void applyDesktopPlacement(event.currentTarget.value as DesktopPlacementId)}
-        >
-          <option value="bottomRight">右下</option>
-          <option value="bottomLeft">左下</option>
-          <option value="topRight">右上</option>
-          <option value="topLeft">左上</option>
-          <option value="lastPosition">记住拖动</option>
-        </select>
+          {settingsOpen ? (
+            <div className="compact-settings" role="dialog" aria-label="小光团设置">
+              <section>
+                <h2>陪伴</h2>
+                <div className="ability-toggles" aria-label="能力开关">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={model.data.settings.catchTomorrowEnabled}
+                      onChange={(event) => model.setCatchTomorrowEnabled(event.currentTarget.checked)}
+                    />
+                    <span>接住明天</span>
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={model.data.settings.gentleRemindersEnabled}
+                      onChange={(event) => model.setGentleRemindersEnabled(event.currentTarget.checked)}
+                    />
+                    <span>轻声提醒</span>
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={model.data.settings.hoverInteractionEnabled}
+                      onChange={(event) => model.setHoverInteractionEnabled(event.currentTarget.checked)}
+                    />
+                    <span>靠近回应</span>
+                  </label>
+                </div>
+              </section>
 
-        <button
-          className="recenter-button"
-          type="button"
-          title="回到屏幕内"
-          onClick={returnPetToScreen}
-        >
-          回到屏幕内
-        </button>
+              <section>
+                <h2>安静</h2>
+                <select
+                  className="quiet-select"
+                  aria-label="安静模式"
+                  value={quietModeValue}
+                  onChange={(event) => model.setQuietMode(event.currentTarget.value as QuietModeId)}
+                >
+                  <option value="off">关闭</option>
+                  <option value="oneHour">1 小时</option>
+                  <option value="untilTomorrow">到明天</option>
+                  <option value="always">一直</option>
+                </select>
+              </section>
+
+              <section>
+                <h2>桌面</h2>
+                <div className="desktop-settings-row">
+                  <select
+                    className="placement-select"
+                    aria-label="小光团位置"
+                    value={model.data.settings.desktopPlacement}
+                    onChange={(event) => void applyDesktopPlacement(event.currentTarget.value as DesktopPlacementId)}
+                  >
+                    <option value="bottomRight">右下</option>
+                    <option value="bottomLeft">左下</option>
+                    <option value="topRight">右上</option>
+                    <option value="topLeft">左上</option>
+                    <option value="lastPosition">记住拖动</option>
+                  </select>
+
+                  <button
+                    className="recenter-button"
+                    type="button"
+                    title="回到屏幕内"
+                    onClick={returnPetToScreen}
+                  >
+                    回到屏幕内
+                  </button>
+                </div>
+              </section>
+            </div>
+          ) : null}
+        </div>
       </footer>
     </article>
   );
@@ -284,13 +366,13 @@ function getCompanionMessage(input: {
   if (input.gentleReminderMessage) return input.gentleReminderMessage;
 
   switch (input.growthStage) {
-    case "dayNightWatcher":
+    case "dayNightCore":
       return "它把这些天的光都记住了。";
-    case "halo":
+    case "holdingGlow":
       return "小光团的光更稳了一点。";
-    case "stardust":
+    case "starCore":
       return "身体里多了一点星尘光。";
-    case "glow":
+    case "smallGlow":
       return "它越来越会接住你的明天了。";
     default:
       return "小光团在这里，先放下一件小事。";

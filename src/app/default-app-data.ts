@@ -19,7 +19,7 @@ export function createDefaultAppData(localDate = toLocalDateKey(new Date())): Ap
       anchor: "pet"
     },
     growth: {
-      stage: "spark",
+      stage: "seedLight",
       completedTaskCount: 0,
       eveningReviewCount: 0,
       eveningReviewStreak: 0,

@@ -122,6 +122,80 @@ Known risks:
 
 Please verify and return `QA RESULT`.
 
+## 2026-07-07 17:44 CST - QA Result For T-011 Native Drag Fix Recheck
+
+QA RESULT
+Product: 今天明天
+Task ID: T-011 / Full project final acceptance
+From: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Verdict: pass
+
+Evidence:
+- Rechecked the rebuilt signed `.app` from `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`.
+- Confirmed current-build timestamps match the drag-fix handoff:
+  - `dist/index.html`: `2026-07-07 17:07:43 CST`
+  - `src-tauri/target/release/app`: `2026-07-07 17:08:00 CST`
+  - signed `.app`: `2026-07-07 17:08:00 CST`
+- `codesign --verify --deep --strict --verbose=2 /Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app` passed.
+- `pnpm check` passed: lint, typecheck, and Vitest all green; 9 test files / 34 tests.
+- Native QA recheck artifact: `output/playwright/t011-dragfix-qa-native-recheck-result.json`, 8 passed / 0 failed.
+- Web regression artifact: `output/playwright/t011-dragfix-web-regression-result.json`, 3 passed / 0 failed.
+- Native collapsed launch passed: CoreGraphics listed only `小光团` at `X=1100,Y=180,144x144`; panel was not visible.
+- User-visible drag passed through Computer Use: dragging the visible pet from screenshot center `(72,72)` to `(132,132)` moved CoreGraphics bounds from `X=1100,Y=180,144x144` to `X=1330,Y=453,144x144`.
+- Drag did not open the panel. CoreGraphics listed only `小光团` after the drag.
+- Drag persisted app data: `pet.position` changed from `{ "x": 2200, "y": 360, "screenId": null }` to `{ "x": 2660, "y": 906, "screenId": null }`.
+- Relaunch restored the moved visible position at CoreGraphics `X=1330,Y=453,144x144`; panel remained closed and tasks remained empty in the controlled data.
+- Click-open regression passed: Computer Use click on `小光团` opened the `今天明天` panel and focused the `新增任务` text field.
+- Quick-add focus diagnostics passed: `output/playwright/t011-dragfix-qa-ui-diagnostics.json` records `quick-add-focused` and `quick-add-autofocus` for active element `input`, `ariaLabel=新增任务`, `placeholder=写下一件事`.
+- Escape close passed: after click-open, Computer Use `Escape` returned to the `小光团` window only.
+- Outside-click close passed: reopening the panel and clicking outside left only `小光团` visible.
+- Web regression passed on current `dist`: quick add today/tomorrow plus persistence, evening review per-task complete/move/abandon, and no console/page errors.
+- QA restored the user's pre-test local `app-data.json` and `ui-diagnostics.json` after verification and stopped the test app / preview processes.
+
+Findings:
+- No blocking product findings in this recheck.
+- The previous T-011 P1 blocker, native user-visible pet drag not moving/persisting, is accepted as fixed on the `2026-07-07 17:08:00 CST` signed `.app`.
+
+Fix request:
+- None for T-011 local product behavior.
+
+CEO decision needed:
+- No for QA/dev fix work.
+- Yes for final product acceptance and any release-scope expansion: full Xcode, Developer ID signing, notarization, DMG packaging, and launch-at-login native integration remain outside this local signed `.app` QA pass unless CEO expands scope.
+
+## 2026-07-07 17:34 CST - Product Developer -> Product Designer
+
+DEVELOPMENT -> DESIGN
+Product: 今天明天
+Task ID: T-012
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: Product Designer / `019f2224-1f3c-7a50-8923-f43becf03219`
+Subject: Column-local add feasibility response
+
+Feasibility:
+yes
+
+Implementation plan:
+- Add a new compact `ColumnAdd` component for bucket-local task capture instead of refactoring the existing global `QuickAdd` first. This keeps the old global destination-switch model from leaking into the new spatial add interaction.
+- Render one `ColumnAdd` inside the Today column with placeholder `添加今天的事`, aria-label `添加今天的任务`, and submit target `today`.
+- Render one `ColumnAdd` inside the `明天接住` column with placeholder `放到明天`, aria-label `添加明天的任务`, and submit target `tomorrow`.
+- Remove the default top global `QuickAdd` row and its add-specific `今天 / 明天` segmented switch from the main panel.
+- Keep successful submit local: clear the submitted input, show bucket-specific gentle feedback, and refocus the same input.
+- Keep existing task reducer behavior for complete/reopen/move/co-do/`接住明天`/evening review unchanged.
+- Update tests around task creation/focus where practical and re-run the full project checks before QA handoff.
+
+Tradeoffs:
+- I recommend first-pass visible capacity of 4 open tasks per column plus compact overflow rows if needed. The local add row should not be squeezed into an unusable height, and preserving the one-screen empty/light state is more important than forcing 5 visible tasks after the layout change.
+- The existing `QuickAdd` can remain available in code only if still useful for future global capture, but it will not render in the default main task panel for T-012.
+- I will wait for T-011 QA recheck to finish before editing T-012 product code, so QA can verify the `17:08:00 CST` signed app without a source/build mismatch.
+
+Questions:
+- none blocking.
+
+Decision needed from CEO:
+- no.
+
 ## 2026-07-03 19:10 CST - QA RESULT - T-006 partial
 
 QA RESULT
@@ -381,6 +455,41 @@ Known risks:
 - Native Tauri compile/runtime behavior has not been accepted in T-004.
 
 Please verify and return `QA RESULT`.
+
+## 2026-07-04 03:08 CST - QA Verifier -> Product Developer
+
+QA RESULT
+Product: 今天明天
+Task ID: T-008 / T-009 / T-010
+From: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Verdict: pass
+
+Evidence:
+- Fresh QA commands passed: `npx -y pnpm@11.7.0 check`, `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; cargo fmt --manifest-path src-tauri/Cargo.toml --check`, `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; cargo check --manifest-path src-tauri/Cargo.toml`, `git diff --check`, and `codesign --verify --deep --strict --verbose=2 /Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; npx -y pnpm@11.7.0 exec tauri info` reached environment reporting with Rust/Cargo/rustup available; full Xcode remains missing as the known release-packaging/notarization gap.
+- Confirmed current signed-app timestamps before native testing: `dist/index.html` at `2026-07-04 02:14:40 CST`, `src-tauri/target/release/app` and signed `.app` at `2026-07-04 02:14:53 CST`.
+- QA controlled native launch placed the collapsed pet at CoreGraphics `X=1100,Y=180,144x144` with no panel visible.
+- QA slow/long drag recheck passed: a held drag from the pet body center moved `小光团` to `X=1322,Y=340,144x144`, did not open the panel during drag, and persisted `pet.position={ "x": 2644, "y": 680, "screenId": null }`.
+- Relaunch persistence passed: after stopping and reopening the signed `.app`, CoreGraphics restored `小光团` at `X=1322,Y=340,144x144`.
+- Click-open remained accepted after the drag fix: clicking the visible pet opened the panel at CoreGraphics `X=753,Y=112,560x600`.
+- Escape close passed: pressing Escape hid the panel and left only the `小光团` window visible at `X=1322,Y=340,144x144`.
+- Outside-click close passed: reopening the panel and clicking outside both panel and pet hid only the panel and left `小光团` visible.
+- Native focus diagnostics passed: after native click-open, `/Users/yao/Library/Application Support/com.todaytomorrow.desktop/ui-diagnostics.json` recorded `quick-add-focused` plus `quick-add-autofocus`, with active element `tagName=input`, `ariaLabel=新增任务`, `placeholder=写下一件事`.
+- QA saved the native test snapshots before restoring local data: `output/playwright/t008-t010-qa-recheck-app-data-before-restore.json` and `output/playwright/t008-t010-qa-recheck-ui-diagnostics.json`.
+- QA restored the user's pre-test app data / diagnostics and stopped the test app process after verification.
+
+Findings:
+- No blocking product findings in this recheck. The prior P1 native drag failure is fixed on the `02:14:53 CST` signed app.
+- Verification limit, not a product failure: Computer Use still cannot attach to this transparent/nonstandard Tauri window (`cgWindowNotFound`), and macOS synthetic keyboard events did not independently prove native task submission or `quick-add-refocus-after-submit`. Native autofocus is accepted through the new diagnostics file; add/refocus behavior remains covered by the existing web smoke and unit checks.
+
+Fix request:
+- None for T-008 / T-009 / T-010.
+- Optional future testability improvement: if the team wants native submit/refocus acceptance from automation rather than manual use, expose a stable diagnostic or automation path for submitted quick-add text and post-submit focused element.
+
+CEO decision needed:
+- No for this QA pass.
+- Yes only if final acceptance must additionally require a human manual native quick-add submit pass, full Xcode, Developer ID signing, notarization, or DMG distribution before release.
 
 ## 2026-07-03 19:05 CST - Product Developer -> QA Verifier
 
@@ -674,6 +783,248 @@ Allowed negotiation:
 
 Please respond with feasibility, implementation plan, risks, and any product questions.
 
+## 2026-07-07 17:35 CST - T-012 Design ACK To Development
+
+DESIGN ACK
+Product: 今天明天
+Task ID: T-012
+From: Product Designer / `019f2224-1f3c-7a50-8923-f43becf03219`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Subject: Column-local add feasibility accepted
+
+Response:
+Accepted. The implementation plan preserves the T-012 product intent.
+
+Accepted details:
+- Use a new `ColumnAdd` component.
+- Keep the old `QuickAdd` out of the default main task panel.
+- Add Today-local and Tomorrow-local inputs in their respective columns.
+- Use `添加今天的事` and `放到明天` for first-pass placeholders.
+- Submit clears and refocuses the same local input.
+- Adding in Tomorrow does not jump focus to Today.
+- Preserve existing complete / move / co-do / `接住明天` / evening review behavior.
+- First-pass visible capacity may be 4 open tasks per column plus compact overflow rows if this preserves usable add rows and one-screen layout.
+- Waiting for T-011 QA recheck before T-012 code edits is accepted.
+
+Updated reference:
+- `docs/design/t-012-column-local-add.md` now explicitly accepts the 4-visible-task first-pass tradeoff.
+- `docs/qa-checklist.md` now tells QA not to reject the design for using 4 visible tasks plus overflow when local add rows remain usable.
+
+Decision needed from CEO:
+- No.
+
+## 2026-07-04 01:03 CST - Product Developer -> QA Verifier
+
+DEVELOPMENT -> QA
+Product: 今天明天
+Task ID: T-008 / T-009 / T-010
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+Subject: Ready for native pet click/drag and visual recheck
+
+Implemented:
+- Moved native panel show / position / focus for macOS through a main-thread path, removing the prior off-main AppKit crash risk.
+- Added CoreGraphics mouse event counters so very short click events on the transparent pet window are not missed between polling ticks.
+- Kept native pet dragging on the body hit-test path and persisted moved physical window coordinates after drag.
+- Added native panel global close fallback: Escape and true outside clicks hide only the panel and keep the collapsed pet visible, even when transparent / separate windows do not become the active app under automation.
+- Added `acceptFirstMouse` to the pet window config.
+- Reduced the bright mature `dayNightCore` edge treatment: softer border, tighter internal bloom, no complete external body ring, and lower floor-shadow opacity.
+
+Changed files:
+- `src-tauri/src/window.rs`
+- `src-tauri/tauri.conf.json`
+- `src/shared/styles/base.css`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+
+Verification already run:
+- `npx -y pnpm@11.7.0 check` passed: lint, typecheck, and Vitest all green; 9 test files / 34 tests.
+- `npx -y pnpm@11.7.0 build` passed as part of `tauri:build`.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; cargo fmt --manifest-path src-tauri/Cargo.toml --check` passed.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; cargo check --manifest-path src-tauri/Cargo.toml` passed.
+- `rm -rf src-tauri/target/release/bundle && export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; npx -y pnpm@11.7.0 tauri:build` passed and generated `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`.
+- `codesign --verify --deep --strict --verbose=2 /Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app` passed.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; npx -y pnpm@11.7.0 exec tauri info` reached environment reporting; Rust/Cargo/rustup are installed, full Xcode remains missing.
+- `git diff --check` passed.
+- Native CoreGraphics smoke result: `output/playwright/t008-t010-native-final-smoke-result.json`.
+  - Pet click opened the native panel: `panelOpenedByPetClick=true`, panel bounds `560x600` at `X=531,Y=38`.
+  - Escape closed the panel and left the pet visible: `panelVisibleAfterEscape=false`, `petVisibleAfterEscape=true`.
+  - Outside click closed the panel and left the pet visible: `panelVisibleAfterOutsideClick=false`, `petVisibleAfterOutsideClick=true`.
+  - Drag moved the pet from CoreGraphics `X=1100,Y=180` to `X=1250,Y=268`.
+  - Saved position after drag was physical Tauri coordinates `{ "x": 2500, "y": 536, "screenId": null }`.
+  - Relaunch restored the moved visual position at CoreGraphics `X=1250,Y=268`: `dragPersistedAfterRelaunch=true`.
+
+Acceptance criteria to verify:
+- Native visible pet click opens the panel reliably.
+- Native collapsed pet drag moves the window and persists after relaunch.
+- Escape hides only the panel and leaves the collapsed pet visible.
+- Outside click hides only the panel and leaves the collapsed pet visible.
+- Mature / bright `dayNightCore` reads as body-owned self-emission, not a complete external halo/ring.
+- Existing web-accepted T-008/T-009/T-010 behavior remains unchanged.
+
+Known risks:
+- Computer Use still cannot attach to the transparent pet window (`cgWindowNotFound`), matching the earlier QA tooling limitation.
+- Shell-synthetic keyboard typing into the native panel still cannot prove quick-add focus because macOS keeps the previous foreground app for synthetic events in this environment. Please perform a hands-on quick-add/focus pass on the signed `.app` if available.
+- Full Xcode, Developer ID signing, notarization, and DMG distribution remain out of scope for this local signed `.app` recheck.
+
+Please verify and return `QA RESULT`.
+
+## 2026-07-03 21:09 CST - Product Developer -> QA Verifier
+
+DEVELOPMENT -> QA
+Product: 今天明天
+Task ID: T-008 / T-009 / T-010
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+Subject: Ready for T-008/T-009/T-010 verification
+
+Implemented:
+- T-008: hardened native panel focus/blur behavior with internal pointer/focus grace windows, delayed quick-add autofocus, Tab focus containment, Escape close, and quick-add refocus after submit.
+- T-008: moved ability and desktop controls behind a compact footer settings popover while keeping theme swatches and glow strength lightweight.
+- T-008: made task rows reading-first by default; completion circle/title stay visible while `陪做` and move controls reveal on hover/focus; `陪做中` remains visible.
+- T-008: added short panel open transition with reduced-motion opacity fallback, and continued self-emissive pet visual polish.
+- T-009: made `接住明天` the evening strip brand action with invitation `还有 N 件，我帮你接到明天？`, primary `接住明天`, secondary `先留在今天`, neutral dismiss behavior, and confirmation `我接住了，明天还在。`.
+- T-009: moved caught tasks to Tomorrow as normal open tasks, updated counts immediately, highlighted the Tomorrow shelf with `已接住 +N`, and made `接住明天` the strongest growth signal through existing growth weighting.
+- T-010: replaced weak growth expression with five visible body-form stages: `seedLight`, `smallGlow`, `starCore`, `holdingGlow`, and `dayNightCore`.
+- T-010: added legacy saved-data compatibility for old stage names while preventing legacy `halo` from surfacing in runtime DOM/CSS.
+- T-010: added body-owned growth layers: core light, clipped internal particles, lower holding layer, day/night internal structure, face depth, tight body spill, and floor shadow.
+- T-010: wired short body-level reactions for record, complete, `接住明天`, review, and co-do states through existing model signals.
+
+Changed files:
+- `src/app/app-model.ts`
+- `src/app/app-model.test.ts`
+- `src/app/app-storage.ts`
+- `src/app/default-app-data.ts`
+- `src/app/views/panel-view.tsx`
+- `src/app/views/pet-view.tsx`
+- `src/features/growth/growth-rules.ts`
+- `src/features/growth/growth-rules.test.ts`
+- `src/features/growth/growth-types.ts`
+- `src/features/pet/components/glow-pet.tsx`
+- `src/features/pet/components/glow-pet.test.tsx`
+- `src/features/settings/theme-options.ts`
+- `src/features/tasks/components/task-column.tsx`
+- `src/features/tasks/components/task-panel.tsx`
+- `src/shared/styles/base.css`
+- `docs/agents/board.md`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+
+Verification already run:
+- `npx -y pnpm@11.7.0 check` passed: lint, typecheck, and Vitest all green; 9 test files / 34 tests.
+- `npx -y pnpm@11.7.0 build` passed.
+- Playwright web smoke passed: `output/playwright/t008-t010-smoke-result.json` records 14 checks, 0 console errors, and 0 page errors.
+- Playwright confirmed: quick-add focused after panel open; default 560x600 panel has no body/internal panel scroll; default panel hides settings; settings popover exposes `接住明天`, `轻声提醒`, `靠近回应`, `安静模式`, position; quick-add clears/refocuses after add.
+- Playwright confirmed: `接住明天` suggestion copy appears; confirm moves 2 today tasks into Tomorrow, updates Today/Tomorrow counters `0/3`, shows `已接住 +2` and `我接住了，明天还在。`; dismiss does not immediately re-show the same suggestion.
+- Playwright confirmed: caught tasks persist as normal tomorrow tasks with no overdue/failure/shame labels; growth `tomorrowCatchCount` increments.
+- Playwright confirmed T-010 stage metrics: Stage 1 body about `68x68`; Stage 5 about `100x96`; Stage 3 internal specks visible; Stage 4 holding layer opacity `0.86`; Stage 5 day/night layer opacity `0.9`.
+- Screenshots captured:
+  - `output/playwright/t008-panel-default.png`
+  - `output/playwright/t009-catch-feedback.png`
+  - `output/playwright/t010-seedLight.png`
+  - `output/playwright/t010-smallGlow.png`
+  - `output/playwright/t010-starCore.png`
+  - `output/playwright/t010-holdingGlow.png`
+  - `output/playwright/t010-dayNightCore.png`
+- `cargo fmt --manifest-path src-tauri/Cargo.toml --check` passed.
+- `rm -rf src-tauri/target/release/bundle && export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; npx -y pnpm@11.7.0 tauri:build` passed and generated `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`.
+- `codesign --verify --deep --strict --verbose=2 /Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app` passed.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; npx -y pnpm@11.7.0 exec tauri info` reached environment reporting; full Xcode remains missing.
+- Native launch/window smoke: the current signed app process stayed alive, and CoreGraphics listed current-build windows for `小光团` at `144x144` and the panel at `560x600`.
+
+Acceptance criteria to verify:
+- QA checklist section `9. T-008 前端丝滑度验收项`.
+- QA checklist section `10. T-009 明天接住 品牌体验验收项`.
+- QA checklist section `11. T-010 小光团本体可见成长验收项`.
+- `docs/design/t-008-frontend-smoothness-polish.md` section 15 acceptance criteria.
+- `docs/design/t-009-catch-tomorrow-brand-growth.md` section 15 acceptance criteria.
+- `docs/design/t-010-visible-pet-body-growth.md` section 11 acceptance criteria.
+- Native hands-on: click/typing in quick-add, Tab traversal, settings controls, task rows, `接住明天`, `下班整理`, Escape, outside close, drag, and transparent pet visual.
+
+Known risks:
+- Computer Use could not reliably interact with the transparent/nonstandard pet window in this environment; QA should perform hands-on native validation for focus, pointer, drag, and visual compositing.
+- Full Xcode, Apple notarization, Developer ID signing, and DMG distribution remain unverified.
+- An older already-running app process was present on this machine; this handoff verifies the newly rebuilt signed `.app` and records current-build CoreGraphics window evidence.
+
+Please verify and return `QA RESULT`.
+
+## 2026-07-03 21:40 CST - QA Result For T-008/T-009/T-010
+
+QA RESULT
+Product: 今天明天
+Task ID: T-008 / T-009 / T-010
+From: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Verdict: partial
+
+Evidence:
+- Reviewed `docs/qa-checklist.md` sections 9, 10, and 11, plus the T-008/T-009/T-010 developer handoff.
+- Rechecked developer smoke result `output/playwright/t008-t010-smoke-result.json`: 14 checks passed, 0 console errors, 0 page errors.
+- Reviewed screenshots `output/playwright/t008-panel-default.png`, `output/playwright/t009-catch-feedback.png`, and T-010 stage screenshots. Web panel one-screen layout, progressive settings, `接住明天` copy/feedback, normal Tomorrow task persistence, and visible growth-stage metrics are accepted at the web-smoke level.
+- Native current signed app process stayed alive after controlled relaunch from `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`.
+- CoreGraphics on-screen check after controlled relaunch listed only the collapsed `小光团` window at `144x144` in collapsed state; panel was not on-screen while collapsed.
+- Native window capture `output/playwright/t008-native-pet-visible-controlled.png` shows the transparent pet window rendering a visible self-emissive body; no white square tile was captured.
+- Computer Use still could not attach to the transparent/nonstandard pet window: `cgWindowNotFound` / `noWindowsAvailable`.
+- Simulated desktop click attempts on the visible pet body did not open the panel; CoreGraphics on-screen window list remained pet-only and app data stayed `panel.open=false`.
+- Simulated desktop drag from the visible pet body did not move the native window; CoreGraphics bounds stayed `X=1100,Y=180,144x144` and app data stayed `pet.position={x:2200,y:360}`.
+
+Findings:
+- P1 - Native pet click-to-open was not verified and failed under QA simulation. Repro: launch current signed app with pet visible on screen, click inside the pet body center; expected panel window appears near pet, actual on-screen window list remains collapsed pet only and app data remains closed. This also prevents native hands-on verification of quick-add typing/focus, Tab traversal, settings controls, task rows, `接住明天`, `下班整理`, Escape, and outside-close from the real desktop path.
+- P1 - Native pet drag did not move or persist in QA simulation, matching the user's reported defect that the small glow pet cannot be dragged. Repro: drag from the visible pet body center to a new point; expected CoreGraphics bounds and saved `pet.position` change, actual bounds/data remain unchanged.
+- P2 - Bright mature pet capture reads like a complete external ring/halo around the body. Repro: use `blueNight` + `bright` + `dayNightCore`, capture the native pet window; expected tight body-owned self-emission, actual image shows a very complete outer ring around the sphere. This risks failing T-010 criteria that glow must not look like a halo/ring/orbit.
+- P3 - Settings popover can cover the evening strip action area in the 560x600 web panel. Closing settings restores access, so this is not blocking, but it is a small smoothness issue.
+
+Fix request:
+- Fix native pet hit testing/click handling so a real click on the visible self-emissive body opens the native panel reliably.
+- Fix native pet dragging so mouse drag moves the `pet` window and persists the moved position after relaunch.
+- Recheck whether `data-tauri-drag-region`, transparent window hit testing, and the custom React pointer-drag implementation are conflicting. Prefer one reliable native path for drag/click.
+- Reduce or reshape `bright` / mature-stage body spill so glow remains body-owned and does not read as a complete external ring.
+- After fixes, send a new DEVELOPMENT -> QA handoff with native evidence for click-open, drag persistence, Escape/outside close, and at least one native panel quick-add/focus run.
+
+CEO decision needed:
+- No for the fixes above; they are inside the accepted T-008/T-010 scope and directly match user-reported defects.
+- Yes only if the team wants to ship without native click/drag acceptance or accept the mature-stage external-ring look despite the T-010 criteria.
+
+## 2026-07-03 19:50 CST - T-009 Design Reference To Development
+
+DESIGN -> DEVELOPMENT
+Product: 今天明天
+Task ID: T-009
+From: Product Designer / `019f2224-1f3c-7a50-8923-f43becf03219`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Subject: `明天接住` brand experience and growth-system reference
+
+Design intent:
+Make `接住明天` the product's signature brand action. It should feel like the pet gently holds unfinished today tasks for tomorrow, not like a mechanical postpone / overdue action.
+
+Required behavior if / when T-009 is assigned:
+- Main action label uses `接住明天`.
+- Invitation copy uses the pattern `还有 N 件，我帮你接到明天？`.
+- Secondary action uses soft copy such as `先留在今天`.
+- No overdue / failure / shame language appears around caught tasks.
+- Confirming `接住明天` gives a gentle Today-to-Tomorrow transition.
+- Tomorrow shelf visually receives tasks.
+- Pet reacts through body self-emission / internal light, not external halo, confetti, or reward explosion.
+- Reduced motion preserves meaning without path movement.
+- Caught tasks become normal tomorrow tasks after movement and restart.
+- Growth uses `接住明天` as a strong relationship-with-time signal, but does not show XP, score, streak pressure, or punishment.
+
+Reference docs:
+- `docs/design/t-009-catch-tomorrow-brand-growth.md`
+- `docs/product-spec.md`
+- `docs/qa-checklist.md`
+- `docs/agents/board.md`
+
+Open implementation questions:
+- None yet. This is a design-ready reference, not an instruction to interrupt T-008 unless user / CEO assigns implementation priority.
+
+Allowed negotiation:
+- Product Developer may simplify animation if the feeling of handing / receiving is preserved.
+- Product Developer may defer advanced growth-stage visuals if first implementation preserves non-pressure growth rules and copy.
+
+Outcome:
+Design reference recorded for Product Developer.
+
 ## 2026-07-03 17:57 CST - T-006 Pet Glow Clarification To Development
 
 DESIGN -> DEVELOPMENT
@@ -865,5 +1216,583 @@ Known risks:
 - Browser screenshots prove layout and DOM/CSS behavior, but QA should still visually inspect native transparent-window compositing in the signed `.app`.
 - Full Xcode is still missing, so Apple notarization, Developer ID signing, and formal distribution are not verified.
 - T-007 was acknowledged only; it is not part of this verification request.
+
+Please verify and return `QA RESULT`.
+
+## 2026-07-03 20:22 CST - Product Developer -> QA Verifier
+
+DEVELOPMENT -> QA
+Product: 今天明天
+Task ID: T-006
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+Subject: Ready for T-006 P1 native recheck
+
+Implemented:
+- Fixed Escape handling so `hide_panel` hides only the `panel` window, then explicitly `show()`s and focuses the collapsed `pet` window.
+- Reworked native pet drag to use physical Tauri window coordinates instead of logical / scaled coordinates.
+- Added manual pointer drag movement from the pet body surface, with click suppression after drag so drag attempts do not accidentally open the panel.
+- Added native position tracking after drag and persisted the final pet window position into app data.
+- Restored saved pet position at native launch using visible physical-coordinate candidates, with compatibility for earlier saved scaled positions.
+- Kept the collapsed drag surface on `.pet-shell-body` so the user drags the self-emissive pet body, not a visible square tile.
+
+Changed files:
+- `src/app/views/pet-view.tsx`
+- `src/features/desktop-shell/window-events.ts`
+- `src/features/pet/components/glow-pet.tsx`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/window.rs`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+
+Verification already run:
+- `cargo fmt --manifest-path src-tauri/Cargo.toml` completed after installing `rustfmt`; Rust files are now formatted with standard Rust indentation.
+- `npx -y pnpm@11.7.0 check` passed: lint, typecheck, and Vitest all green; 8 test files / 32 tests.
+- `rm -rf src-tauri/target/release/bundle && export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; npx -y pnpm@11.7.0 tauri:build` passed and generated `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`.
+- `codesign --verify --deep --strict --verbose=2 /Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app` passed.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; npx -y pnpm@11.7.0 exec tauri info` reached environment reporting; full Xcode remains missing.
+- Native smoke: after opening the panel and pressing Escape, only the `小光团` pet window remained visible and app state recorded `panelOpen=false`.
+- Native smoke: dragging the pet changed native window bounds from CoreGraphics `X=-217,Y=161` to `X=-391,Y=287`; app data saved physical Tauri position `{"x":-782,"y":574}`.
+- Native smoke: after relaunch, the pet restored at the moved visual location; CoreGraphics reports scaled visual coordinates while Tauri/app data store physical coordinates.
+
+Acceptance criteria to verify:
+- Pressing Escape closes only the panel and leaves the collapsed pet visible / focusable.
+- Mouse drag moves the native pet window instead of hiding or losing the window.
+- Moved pet position persists after relaunch.
+- Click-to-open still works after prior drag attempts.
+- T-006 visual acceptance remains intact: collapsed pet is a dimensional self-emissive body, not an external halo / ring / square tile.
+- Keep T-006 checklist section 7 separate from T-007 section 8 when reporting verdicts; current source also contains T-007 scope and should not be counted as a T-006 regression by itself.
+
+Known risks:
+- Full Xcode, Apple notarization, Developer ID signing, and DMG distribution remain unverified and outside this local `.app` recheck.
+- T-008 has a separate pending polish scope for native panel input / internal focus safety and progressive settings disclosure.
+
+Please verify and return `QA RESULT`.
+
+## 2026-07-03 20:22 CST - Product Developer -> Product Designer
+
+DEVELOPMENT -> DESIGN
+Product: 今天明天
+Task ID: T-008
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: Product Designer / `019f2224-1f3c-7a50-8923-f43becf03219`
+Subject: Frontend smoothness feasibility response
+
+Feasibility:
+Yes. The T-008 smoothness pass is feasible in the existing React + Tauri architecture.
+
+Implementation plan:
+- Add panel interaction guards that distinguish internal pointer / focus movement from true outside close intent.
+- Delay quick-add autofocus until after native panel show / focus completes, then restore focus after each successful add.
+- Use the safest fallback if native blur remains noisy: preserve panel state during active internal interaction and hide only on Escape, explicit outside pointer, or explicit close.
+- Move ability and desktop controls behind a compact footer settings popover / details surface; keep theme and glow controls visible only if they remain visually light.
+- Make task rows calm by default, with completion circle + title visible and row actions revealed on hover / focus or compact action surface.
+- Add a short pet-anchored opacity / scale transition, reduced to opacity only for reduced motion.
+- Polish pet self-emission so brightness reads from the core/body/edge spill rather than a complete ring.
+
+Tradeoffs:
+- An inline popover / details surface is the lowest-risk compact settings implementation; a full settings page is intentionally avoided.
+- Hover-only row actions are insufficient for keyboard and non-hover cases, so focus-reveal and compact action fallback should be built in the first pass.
+- Native focus APIs may remain imperfect across WebView/window boundaries, so the implementation should prioritize not losing user input over aggressive blur hiding.
+
+Questions:
+- None blocking.
+
+Decision needed from CEO:
+- No. T-008 can proceed as a product polish implementation under the accepted design scope when it becomes the active development task.
+
+## 2026-07-03 20:30 CST - T-010 Design To Development Handoff
+
+DESIGN -> DEVELOPMENT
+Product: 今天明天
+Task ID: T-010
+From: Product Designer / `019f2224-1f3c-7a50-8923-f43becf03219`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Subject: Visible pet body growth evolution
+
+Design intent:
+Make the pet's growth visible through body-form evolution. The user should be able to look at the desktop pet and feel that it has grown because they recorded tasks, completed tasks, used `接住明天`, completed evening review, and used `陪做模式`. Growth should not read as a larger external glow circle.
+
+Required behavior:
+- Replace the current weak growth expression with five visibly distinct body-form stages.
+- Keep the earliest prototype's soft `小光团` feeling: rounded warm body, tiny face, gentle breathing, and floor shadow.
+- Do not restore the old large `.pet-aura` / outer halo. Light must originate from the body core, internal layers, body edge, and tight body-owned spill.
+- Stage 1 should be a small seed-like light body.
+- Stage 2 should be a fuller small glow body with a clearer face.
+- Stage 3 should show internal star / memory particles inside the body.
+- Stage 4 should show a visible lower holding / receiving body form for `接住明天`.
+- Stage 5 should show a mature internal day/night or layered light structure.
+- Recording tasks, completing tasks, `接住明天`, evening review, and co-do mode should produce short body-level reactions where feasible.
+- If code currently keeps `halo` as an internal enum value, avoid surfacing it as a design concept; prefer `holdingGlow` naming for new CSS / comments if migration is reasonable.
+
+Acceptance criteria:
+- A still screenshot of Stage 1 and Stage 5 clearly shows the pet has grown.
+- Stage 3 differs from Stage 2 through visible internal particles.
+- Stage 4 differs from Stage 3 through a lower holding / receiving body form.
+- Stage 5 has mature internal light structure, not merely stronger glow.
+- `接住明天` triggers the strongest body reaction and contributes strongly to growth.
+- Glow reads as coming from the body itself, not from an external halo / ring / large aura.
+- Themes and glow intensity still work across all stages.
+- No XP, level number, streak pressure, pet punishment, shop, accessories, or complex character animation is introduced.
+
+Reference docs:
+- `docs/design/t-010-visible-pet-body-growth.md`
+- `docs/product-spec.md`
+- `docs/qa-checklist.md`
+- `prototype/static-web/styles.css` for original soft body / face / shadow feeling only; do not reuse `.pet-aura` as a large outside glow.
+
+Open implementation questions:
+- Please confirm whether the existing `GrowthStage` enum can be renamed away from `halo`, or whether a compatibility mapping is safer.
+- Please confirm whether CSS-only layered spans are sufficient for Stage 4 / Stage 5, or whether the pet component needs small extra internal layer elements.
+
+Allowed negotiation:
+- Product Developer may keep existing growth thresholds if visible stage differences become clear.
+- Product Developer may simplify exact pixel sizes if the hierarchy of seed -> small body -> internal particles -> holding form -> mature internal light is preserved.
+- Product Developer may implement event reactions in a first pass for `complete task` and `接住明天`, then add smaller reactions later, if the persistent stage forms are strong.
+
+Please respond with feasibility, implementation plan, risks, and any product questions.
+
+## 2026-07-04 01:38 CST - Product Developer -> QA Verifier (latest)
+
+DEVELOPMENT -> QA
+Product: 今天明天
+Task ID: T-008 / T-009 / T-010
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+Subject: Final ready-for-QA handoff after current-build native recheck
+
+Implemented:
+- Kept the T-008/T-009/T-010 implementation intact and revalidated the current rebuilt source.
+- Native transparent pet input fixes are active in the current signed `.app`: visible pet click opens the panel, native drag moves the pet window, moved position persists after relaunch, Escape hides only the panel, and outside click hides only the panel.
+- Mature bright `dayNightCore` pet styling remains tightened so light reads from the body/core/edge instead of a complete external ring.
+
+Changed files:
+- `src-tauri/src/window.rs`
+- `src-tauri/tauri.conf.json`
+- `src/shared/styles/base.css`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+
+Verification already run:
+- `npx -y pnpm@11.7.0 check` passed: lint, typecheck, and Vitest all green; 9 test files / 34 tests.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; cargo fmt --manifest-path src-tauri/Cargo.toml --check` passed.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; cargo check --manifest-path src-tauri/Cargo.toml` passed.
+- `git diff --check` passed.
+- `rm -rf src-tauri/target/release/bundle` completed before rebuild.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; npx -y pnpm@11.7.0 tauri:build` passed and generated `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app` from the current source.
+- `codesign --verify --deep --strict --verbose=2 /Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app` passed.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; npx -y pnpm@11.7.0 exec tauri info` reached environment reporting; Rust/Cargo/rustup are installed and full Xcode remains missing.
+- Current-build timestamps: `dist/index.html` at `2026-07-04 01:22:35 CST`, `src-tauri/target/release/app` and signed `.app` at `2026-07-04 01:22:50 CST`.
+- Native CoreGraphics smoke result updated at `output/playwright/t008-t010-native-final-smoke-result.json`:
+  - `panelOpenedByPetClick=true`; panel bounds `560x600`.
+  - `panelVisibleAfterEscape=false` and `petVisibleAfterEscape=true`.
+  - `panelVisibleAfterOutsideClick=false` and `petVisibleAfterOutsideClick=true`.
+  - `dragMoved=true`; pet moved from CoreGraphics `X=1100,Y=180` to `X=1250,Y=268`.
+  - Saved moved position was physical Tauri coordinates `{ "x": 2500, "y": 536, "screenId": null }`.
+  - `dragPersistedAfterRelaunch=true`; relaunch restored the pet at CoreGraphics `X=1250,Y=268`.
+
+Acceptance criteria to verify:
+- Native visible pet click opens the panel reliably from the collapsed desktop pet.
+- Native collapsed pet drag moves the window and persists after relaunch.
+- Escape hides only the panel and leaves the collapsed pet visible.
+- Outside click hides only the panel and leaves the collapsed pet visible.
+- Native quick-add/input/focus flow remains usable by a real user after click-open.
+- Mature bright `dayNightCore` reads as body-owned self-emission, not a complete external halo/ring.
+- Existing web-accepted T-008/T-009/T-010 behavior remains unchanged.
+
+Known risks:
+- Computer Use still cannot attach to the transparent pet window (`cgWindowNotFound`), matching the earlier QA tooling limitation.
+- Shell-synthetic keyboard typing into the native panel still cannot prove quick-add focus because macOS keeps the previous foreground app for synthetic events in this environment. Please perform a hands-on quick-add/focus pass on the signed `.app` if available.
+- The Escape smoke uses a 1s post-open settling period and an 800ms synthetic key hold because `CGEventSourceKeyState` observes key-state duration, not instantaneous synthetic key taps.
+- Full Xcode, Developer ID signing, notarization, and DMG distribution remain out of scope for this local signed `.app` recheck.
+
+Please verify and return `QA RESULT`.
+
+## 2026-07-04 01:58 CST - QA Result For T-008/T-009/T-010 Latest Recheck
+
+QA RESULT
+Product: 今天明天
+Task ID: T-008 / T-009 / T-010
+From: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Verdict: partial
+
+Evidence:
+- Re-read the latest handoff `2026-07-04 01:38 CST - Product Developer -> QA Verifier (latest)` and checked `output/playwright/t008-t010-native-final-smoke-result.json`.
+- Fresh QA verification passed:
+  - `npx -y pnpm@11.7.0 check`: 9 test files / 34 tests passed.
+  - `cargo fmt --manifest-path src-tauri/Cargo.toml --check` passed.
+  - `cargo check --manifest-path src-tauri/Cargo.toml` passed.
+  - `codesign --verify --deep --strict --verbose=2 /Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app` passed.
+  - `git diff --check` passed.
+- Current-build timestamps match the handoff: `dist/index.html` at `2026-07-04 01:22:35 CST`, `src-tauri/target/release/app` and signed `.app` at `2026-07-04 01:22:50 CST`.
+- QA controlled native launch placed the collapsed pet at CoreGraphics `X=1100,Y=180,144x144`; only the `小光团` window was on-screen in collapsed state.
+- Native click on the visible pet body opened the panel: panel appeared at CoreGraphics `X=531,Y=38,560x600`.
+- Native Escape after panel open hid only the panel; `小光团` remained visible at `X=1100,Y=180,144x144`.
+- Native outside-click flow hid the panel and left `小光团` visible.
+- Native panel screenshot `output/playwright/t008-t010-qa-final-panel-open.png` shows the current one-screen panel and no visible default internal scrolling.
+- Native pet screenshot `output/playwright/t008-t010-qa-final-pet-bright-dayNightCore.png` shows the mature bright pet is visible and no white square tile appears. The glow now reads mostly as body/edge/floor-shadow emission rather than the earlier complete external ring.
+- Existing web smoke result still has no failed checks: `jq '.checks | map(select(.pass != true))' output/playwright/t008-t010-smoke-result.json` returned `[]`.
+- QA restored the pre-test app data after verification.
+
+Findings:
+- P1 - Native collapsed pet drag still did not pass QA recheck. Repro: launch the current signed app with pet visible at `X=1100,Y=180`, drag from the visible pet body center toward `X=1322,Y=340`; expected the `小光团` window moves and app data persists a new `pet.position`; actual CoreGraphics bounds stayed `X=1100,Y=180,144x144`, app data stayed `{ "x": 2200, "y": 360 }`, and the gesture was treated like a click by opening the panel. QA repeated this after a clean relaunch with a slower/longer drag path and got the same no-move result.
+- P2 - Native quick-add/focus cannot be accepted from QA automation. Repro: after click-open, clicking the quick-add input and sending synthetic keyboard text did not create a task; app data remained `tasks=[]` in the controlled test. System Events still reported the previous foreground app as `Notion`, so this may be the known macOS synthetic-keyboard limitation, but QA does not have evidence that native quick-add focus works by real user interaction.
+
+Fix request:
+- Rework or further verify the collapsed pet drag path. Current QA evidence indicates pointer movement from the pet body is still interpreted as click/open instead of native move/persist.
+- Provide fresh native drag evidence that can be reproduced from a clean app launch, ideally including the exact event path or a short screen recording/manual observation if automation remains unreliable.
+- Provide native real-user quick-add evidence, or add an automation-accessible validation path that proves the panel receives keyboard focus after click-open and after submit.
+- No fix requested for click-open, Escape close, outside close, Web T-008/T-009/T-010 behavior, or the mature bright pet visual based on this QA pass.
+
+CEO decision needed:
+- No for the drag/focus fixes; they remain inside the accepted T-008 desktop interaction scope.
+- Yes only if the team wants to ship while native drag remains unaccepted, or if native quick-add/focus is intentionally deferred despite being part of the latest handoff.
+
+## 2026-07-04 02:23 CST - Product Developer -> QA Verifier
+
+DEVELOPMENT -> QA
+Product: 今天明天
+Task ID: T-008 / T-009 / T-010
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+Subject: Ready for recheck after slow-drag and quick-add focus diagnostics fix
+
+Implemented:
+- Removed the native fallback's held-press auto-open behavior. The collapsed pet now opens the panel only on pointer release when the interaction did not become a drag, so slow/long drags are not misclassified as click/open.
+- Preserved native click-open after release, Escape panel close with pet still visible, and outside-click panel close.
+- Added `ui-diagnostics.json` in the Tauri app data directory as a narrow QA validation path for quick-add focus. It records only focus-related UI events when the DOM focus check succeeds.
+- Added quick-add diagnostics for native panel autofocus (`quick-add-focused`, `quick-add-autofocus`) and submit refocus (`quick-add-refocus-after-submit` when a submit occurs).
+
+Changed files:
+- `src-tauri/src/window.rs`
+- `src-tauri/src/persistence.rs`
+- `src-tauri/src/lib.rs`
+- `src/features/desktop-shell/window-events.ts`
+- `src/app/views/panel-view.tsx`
+- `src/features/tasks/components/quick-add.tsx`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+
+Verification already run:
+- `npx -y pnpm@11.7.0 check` passed: lint, typecheck, and Vitest all green; 9 test files / 34 tests.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; cargo fmt --manifest-path src-tauri/Cargo.toml --check` passed after formatting.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; cargo check --manifest-path src-tauri/Cargo.toml` passed.
+- `git diff --check` passed.
+- `rm -rf src-tauri/target/release/bundle && export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; npx -y pnpm@11.7.0 tauri:build` passed.
+- Rebuilt signed app: `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`.
+- `codesign --verify --deep --strict --verbose=2 /Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app` passed.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; npx -y pnpm@11.7.0 exec tauri info` reached environment reporting; Rust/Cargo/rustup installed, full Xcode still missing.
+- Current-build timestamps:
+  - `dist/index.html`: `2026-07-04 02:14:40 CST`
+  - `src-tauri/target/release/app`: `2026-07-04 02:14:53 CST`
+  - signed `.app`: `2026-07-04 02:14:53 CST`
+- Native stable slow-drag smoke result: `output/playwright/t008-t010-native-stable-slow-drag-smoke-result.json`.
+  - Start: CoreGraphics pet `X=1100,Y=180,144x144`.
+  - Slow drag path: held before movement, then dragged toward `X=1322,Y=340`.
+  - Result: `dragMoved=true`, `panelVisibleAfterDrag=false`, saved `pet.position={ "x": 2644, "y": 680, "screenId": null }`.
+  - Relaunch restored CoreGraphics pet `X=1322,Y=340`; `dragPersistedAfterRelaunch=true`.
+  - Click-open still worked after relaunch; Escape hid only panel and left pet visible.
+- Native focus diagnostics smoke result: `output/playwright/t008-t010-native-focus-diagnostic-result.json`.
+  - Opened panel from pet click at `X=531,Y=38,560x600`.
+  - `ui-diagnostics.json` recorded `quick-add-focused` and `quick-add-autofocus`.
+  - Recorded active element was `tagName=input`, `ariaLabel=新增任务`, `placeholder=写下一件事`.
+
+Acceptance criteria to verify:
+- Re-run QA's clean-launch slow/long drag path from `X=1100,Y=180` and confirm the pet moves, no panel opens during drag, app data persists the new physical `pet.position`, and relaunch restores the moved position.
+- Confirm click-open, Escape close, and outside-click close remain accepted on the `02:14:53 CST` signed app.
+- Confirm `ui-diagnostics.json` is written under the Tauri app data directory after native click-open and contains `quick-add-focused` / `quick-add-autofocus` entries for the quick-add input.
+- If doing a real-user submit pass, confirm `quick-add-refocus-after-submit` appears after submit and the quick-add input remains focused.
+- Existing accepted Web T-008/T-009/T-010 behavior and mature bright pet visual should remain unchanged.
+
+Known risks:
+- macOS synthetic keyboard/mouse events still cannot reliably prove full native task creation in this automation environment; the diagnostic path is intended to make focus acceptance observable without relying on synthetic keyboard delivery to the foreground app.
+- Full Xcode, Developer ID signing, notarization, and DMG distribution remain outside this local signed `.app` recheck.
+
+Please verify and return `QA RESULT`.
+
+## 2026-07-07 14:07 CST - Product Developer -> QA Verifier
+
+DEVELOPMENT -> QA
+Product: 今天明天
+Task ID: T-003 / T-004 / T-005 / T-006 / T-007 / T-008 / T-009 / T-010 (Full project final acceptance)
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+Subject: Full project ready for final QA acceptance against development guide
+
+Implemented:
+- Completed the product described by `docs/development-guide.md` as a Tauri + React + TypeScript Mac desktop pet app with separate `pet` and `panel` windows.
+- Preserved the static prototype under `prototype/static-web/` and moved production code into the Vite / React / TypeScript app structure under `src/`.
+- Implemented today/tomorrow tasks: add, complete/reopen, move between buckets, abandon through evening review, persistence, and counts.
+- Implemented day rollover: open tomorrow tasks become today tasks once per local date; completed/abandoned tasks are not rolled over.
+- Implemented evening review / `接住明天`: keep today, move all, per-task complete/move/abandon, gentle copy, and non-shaming tomorrow persistence.
+- Implemented desktop pet behavior: transparent collapsed pet, click-open panel, Escape/outside close, drag, persisted position, recovery / `回到屏幕内`, tray/menu open/recenter/quit.
+- Implemented T-006 through T-010 product polish: one-screen panel, five themes, three glow levels, self-emissive pet body, T-007 abilities, progressive settings, `接住明天` brand action, and five visible body-growth stages.
+- Implemented native app data persistence through Tauri app data JSON with Web localStorage fallback for browser preview and native read/write failure recovery.
+- Updated `docs/development-guide.md` and `docs/qa-checklist.md` so current status no longer claims Rust is missing, persistence is localStorage-only, or transparent pet windows are disabled.
+- Latest QA pass for T-008/T-009/T-010 is already recorded at `2026-07-04 03:08 CST`; this handoff asks for final full-project acceptance against the development guide and QA checklist.
+
+Changed files since the broader implementation began:
+- `src/`
+- `src-tauri/`
+- `docs/development-guide.md`
+- `docs/product-spec.md`
+- `docs/qa-checklist.md`
+- `docs/design/`
+- `docs/agents/`
+- `package.json`
+- `pnpm-lock.yaml`
+- `pnpm-workspace.yaml`
+
+Fresh verification already run on 2026-07-07:
+- `pnpm check` passed: lint, typecheck, and Vitest all green; 9 test files / 34 tests.
+- `pnpm build` passed and rebuilt `dist/`.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; cargo fmt --manifest-path src-tauri/Cargo.toml --check` passed.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; cargo check --manifest-path src-tauri/Cargo.toml` passed.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; pnpm exec tauri info` reached environment, package, plugin, and app reporting; Rust/Cargo/rustup are installed and full Xcode remains missing.
+- `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"; pnpm tauri:build` passed and generated `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`.
+- `codesign --verify --deep --strict --verbose=2 /Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app` passed.
+- Current build timestamps:
+  - `dist/index.html`: `2026-07-07 14:03:45 CST`
+  - `src-tauri/target/release/app`: `2026-07-07 14:04:03 CST`
+  - signed `.app`: `2026-07-07 14:04:03 CST`
+- `git diff --check` passed.
+
+Acceptance criteria to verify:
+- `docs/development-guide.md` section 15 MVP acceptance standards.
+- `docs/development-guide.md` M0-M5 completion expectations, excluding explicit release-distribution items listed under known risks.
+- `docs/qa-checklist.md` sections 1-13, including Web MVP, evening review, day-cycle, desktop pet, T-006, T-007, T-008, T-009, and T-010.
+- Native signed `.app` opens as the desktop pet, keeps collapsed state pet-only, supports click-open, drag/persist/relaunch, Escape/outside close, and app-data JSON persistence.
+- Product remains lightweight: no projects, tags, priorities, heavy dashboard, XP/score/streak pressure, punishment, pet shop, semantic task analysis, or complex task-management fields.
+
+Known risks / out of scope for this local final QA pass:
+- Full Xcode is not installed, so Developer ID signing, Apple notarization, and DMG distribution are not verified.
+- Current bundle target is the signed local `.app`; DMG packaging remains a release task.
+- `launchAtLogin` exists in the settings model but login-item / autostart UI and native integration are not implemented; treat it as a future release setting unless CEO expands scope.
+- Computer Use may still have limitations attaching to the transparent/nonstandard Tauri pet window; previous QA accepted CoreGraphics/window-state evidence plus `ui-diagnostics.json` for focus.
+
+Please verify the current signed `.app` and return `QA RESULT` for final full-project acceptance.
+
+## 2026-07-07 16:47 CST - QA Result For T-011 Final Full-Project Acceptance
+
+QA RESULT
+Product: 今天明天
+Task ID: T-011 / Full project final acceptance
+From: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Verdict: partial
+
+Evidence:
+- Read and followed `docs/agents/manifest.md`, `docs/agents/interaction-protocol.md`, `docs/agents/board.md`, `docs/development-guide.md`, `docs/qa-checklist.md` sections 1-13, and the latest T-011 developer handoff.
+- Fresh QA run before final native testing passed: `pnpm check`, `pnpm build`, `cargo fmt --manifest-path src-tauri/Cargo.toml --check`, `cargo check --manifest-path src-tauri/Cargo.toml`, `pnpm tauri:build`, `codesign --verify --deep --strict --verbose=2 /Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`, and `git diff --check`.
+- QA rebuilt/current artifact timestamps were checked: `dist/index.html` at `2026-07-07 14:18:25 CST`, `src-tauri/target/release/app` and signed `.app` at `2026-07-07 14:18:40 CST`.
+- `pnpm exec tauri info` reached environment reporting in QA but did not cleanly return before interruption; Product Developer's 2026-07-07 handoff separately reports it reached environment/package/plugin/app reporting. Full Xcode remains missing and is release scope, not local behavior scope.
+- Web current-version evening review recheck passed 5/5 with no console/page errors: `output/playwright/t011-web-evening-review-ui-recheck.json`.
+  - Keep exits review without growth increment.
+  - Per-task complete / move / abandon completes review once.
+  - Move-all sends open today tasks to tomorrow and records once.
+  - Empty review completes gently once without opening the review panel.
+- Existing current Web/polish evidence remains accepted, including `output/playwright/t008-t010-smoke-result.json` and earlier T-011 web checks for task CRUD, persistence, date rollover, one-screen panel, theme/glow persistence, `接住明天`, quiet mode, co-do, and visible growth states.
+- Native aggregate evidence is recorded in `output/playwright/t011-native-final-qa-result.json`: 5 passed / 3 failed.
+- Native collapsed launch passed: CoreGraphics listed only `小光团` at `144x144`; no visible panel.
+- Native click-open passed: clicking the visible pet opened a `今天明天` panel at `560x600` while keeping the pet visible. Supplemental evidence: `output/playwright/t011-native-focus-window-final.json`.
+- Native Escape close passed: Escape hid only the panel and left `小光团` visible.
+- Native outside click close passed: outside click hid only the panel and left `小光团` visible.
+- Native quick-add focus diagnostics passed after click-open: `output/playwright/t011-native-focus-diagnostic-final.json` records `quick-add-focused` and `quick-add-autofocus` for active element `input`, `ariaLabel=新增任务`, `placeholder=写下一件事`.
+- Computer Use can now attach to the transparent/nonstandard pet window in this run and shows the user-visible `小光团` window.
+- QA restored the user's pre-test app data and `ui-diagnostics.json` after native checks and stopped the test `.app` process.
+
+Findings:
+- P1 - Native user-visible pet drag is not accepted and blocks final full-project acceptance. Repro: launch `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`, use Computer Use on the visible `小光团` window, drag from the pet body center `(72,72)` to `(132,132)`, then read CoreGraphics and app data. Expected: the `小光团` window moves with the drag and persists a changed `pet.position`. Actual: CoreGraphics still reported `X=1325,Y=656,144x144`, and saved `pet.position` remained `{ "x": 2650, "y": 1312, "screenId": null }`.
+- P1 - A separate CoreGraphics slow-drag pass also failed to move the pet by the intended distance. The test attempted an approximately `180x120` drag; the smoke result recorded no meaningful movement in the main pass, and a clean direct-drag probe moved only about `12px x 9px`, which is not acceptable drag behavior for a desktop pet.
+- P1 - Drag persistence after relaunch cannot be accepted because the dragged target position is not reliably reached in the first place. The relaunch check restored a saved position, but not a verified user-dragged target.
+
+Fix request:
+- Rework the native drag path so dragging the visible pet body moves the `pet` window continuously and predictably.
+- Ensure the drag gesture does not open the panel during or after drag.
+- Persist the moved `pet.position` only after a real drag and restore the same visible position after relaunch.
+- Recheck with a user-visible path, preferably Computer Use plus CoreGraphics or a short screen recording/manual pass, and include exact before/after window bounds plus saved app-data position.
+- No fix is requested for Web task/review behavior, native click-open, Escape close, outside-click close, quick-add autofocus diagnostics, codesigning, or the accepted visual/growth behavior in this result.
+
+CEO decision needed:
+- No for the requested fix; this is inside the existing accepted desktop interaction scope and directly matches the user's earlier drag defect.
+- Yes only if the team wants to ship or mark final product acceptance while native pet drag remains unaccepted.
+
+Known release/future-scope risks kept separate from this finding:
+- Full Xcode, Developer ID signing, notarization, and DMG packaging remain unverified release tasks.
+- `launchAtLogin` exists in settings data but native login-item/autostart integration remains future scope unless CEO expands acceptance.
+
+## 2026-07-07 17:31 CST - Product Developer -> QA Verifier
+
+DEVELOPMENT -> QA
+Product: 今天明天
+Task ID: T-011 / Full project final acceptance
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+Subject: Ready for recheck after native pet drag fix
+
+Implemented:
+- Reworked the collapsed pet pointer-drag path so native visible dragging uses explicit window movement from pointer delta, adjusted by the current Tauri window scale factor.
+- Preserved click behavior by opening the panel on pointer release only when the interaction does not cross the drag threshold.
+- Suppressed click/open after real drags so dragging `小光团` does not open the panel during or after the drag.
+- Kept persisted pet position in physical window coordinates, matching the existing Tauri app-data format and relaunch restore behavior.
+
+Changed files:
+- `src/app/views/pet-view.tsx`
+- `src/features/desktop-shell/window-events.ts`
+- `docs/agents/board.md`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+
+Verification already run:
+- `pnpm check` passed: lint, typecheck, and Vitest all green; 9 test files / 34 tests.
+- `pnpm build` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" cargo fmt --manifest-path src-tauri/Cargo.toml --check` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" cargo check --manifest-path src-tauri/Cargo.toml` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" pnpm tauri:build` passed and rebuilt `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`.
+- `codesign --verify --deep --strict --verbose=2 /Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" pnpm exec tauri info` reached environment/package/plugin/app reporting; Rust/Cargo/rustup are installed and full Xcode remains missing.
+- `git diff --check` passed.
+- Current-build timestamps:
+  - `dist/index.html`: `2026-07-07 17:07:43 CST`
+  - `src-tauri/target/release/app`: `2026-07-07 17:08:00 CST`
+  - signed `.app`: `2026-07-07 17:08:00 CST`
+- Native developer smoke result: `output/playwright/t011-native-drag-fix-dev-smoke-result.json`.
+  - Computer Use drag path from visible `小光团` center `(72,72)` to `(132,132)`.
+  - Before drag: CoreGraphics pet `X=1326,Y=435,144x144`, saved `pet.position={ "x": 2652, "y": 870, "screenId": null }`.
+  - After drag: CoreGraphics pet `X=1386,Y=495,144x144`, saved `pet.position={ "x": 2772, "y": 990, "screenId": null }`.
+  - Panel did not open during drag.
+  - Relaunch restored CoreGraphics pet `X=1386,Y=495,144x144` with the same saved position.
+  - Escape close regression: after opening the panel and activating the app, Escape left only `小光团` visible at `X=1386,Y=495,144x144`.
+  - Click-open regression: clicking `小光团` opened the `560x600` panel and Computer Use reported focus on the `新增任务` text field.
+- Developer restored the pre-test local `app-data.json` and `ui-diagnostics.json` after the native smoke run.
+
+Acceptance criteria to verify:
+- Re-run QA's user-visible drag path against the rebuilt `17:08:00 CST` signed `.app`: drag from visible pet center, confirm CoreGraphics bounds change by the intended distance, no panel opens during drag, app data persists the new physical `pet.position`, and relaunch restores the moved position.
+- Confirm existing accepted native behaviors remain intact: collapsed pet-only launch, click-open, Escape close, outside-click close, and quick-add focus diagnostics.
+- Confirm no regression in Web task/review behavior is introduced by the drag-only fix.
+
+Known risks:
+- Full Xcode, Developer ID signing, notarization, and DMG packaging remain release-scope gaps outside this local signed `.app` recheck.
+- `launchAtLogin` native login-item/autostart integration remains future scope unless CEO expands acceptance.
+
+Please verify and return `QA RESULT`.
+
+## 2026-07-07 17:19 CST - T-012 Design To Development Handoff
+
+DESIGN -> DEVELOPMENT
+Product: 今天明天
+Task ID: T-012
+From: Product Designer / `019f2224-1f3c-7a50-8923-f43becf03219`
+To: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Subject: Column-local task add interaction
+
+Design intent:
+Remove the friction of a top global `写下一件事` input that requires switching between `今天 / 明天`. The panel already has two spatial destinations, so adding should happen directly inside the target column: write in Today to add to Today, write in Tomorrow to add to Tomorrow.
+
+Required behavior:
+- Default main task panel no longer shows the top global `QuickAdd` row.
+- Default add flow no longer requires a `今天 / 明天` segmented switch.
+- Today column includes a local add input with placeholder such as `添加今天的事`.
+- Tomorrow / `明天接住` column includes a local add input with placeholder `放到明天`.
+- Submitting the Today local add creates a `today` task.
+- Submitting the Tomorrow local add creates a `tomorrow` task.
+- Successful submit clears and refocuses the same local input.
+- Adding in Tomorrow must not jump focus back to Today.
+- Empty submit shows bucket-specific gentle feedback.
+- Empty and light-task states remain one-screen.
+- Existing complete / move / co-do / `接住明天` / evening review behavior remains unchanged.
+
+Acceptance criteria:
+- No global top quick-add row is visible in the default task panel.
+- No add-specific `今天 / 明天` segmented switch is visible.
+- Today and Tomorrow each have their own local add input.
+- Today local add creates today tasks; Tomorrow local add creates tomorrow tasks.
+- Both local inputs preserve focus after successful submit.
+- Clicking or typing in either input does not close the native panel.
+- Tab navigation can reach both local inputs and add buttons.
+- No projects, tags, priority, due time, notes, or heavy create-task form is introduced.
+
+Reference docs:
+- `docs/design/t-012-column-local-add.md`
+- `docs/product-spec.md`
+- `docs/qa-checklist.md`
+- `docs/agents/board.md`
+
+Open implementation questions:
+- Please confirm whether it is cleaner to refactor the existing `QuickAdd` into a reusable column-local add component or replace it with a new `ColumnAdd` component.
+- Please confirm whether visible task capacity should remain 5 per column or become 4 per column if the local add row needs more vertical space to preserve the one-screen layout.
+
+Allowed negotiation:
+- Product Developer may choose the exact compact styling and component split if the spatial add behavior is preserved.
+- Product Developer may keep autofocus on Today when the panel opens, but adding in Tomorrow must keep focus in Tomorrow.
+- Product Developer may tune the Tomorrow placeholder if `放到明天` creates ambiguity, but it should remain softer than a generic form label.
+
+Please respond with feasibility, implementation plan, risks, and any product questions.
+
+## 2026-07-07 18:00 CST - Product Developer -> QA Verifier
+
+DEVELOPMENT -> QA
+Product: 今天明天
+Task ID: T-012
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+Subject: Ready for verification
+
+Implemented:
+- Removed the default top global `QuickAdd` row from the main task panel.
+- Removed the default add-specific `今天 / 明天` segmented switch from the task creation path.
+- Added a new `ColumnAdd` component and rendered it inside each planning column.
+- Today column now has a local add input with placeholder `添加今天的事`, `aria-label="添加今天的任务"`, and plus button `aria-label="添加到今天"`.
+- Tomorrow / `明天接住` column now has a local add input with placeholder `放到明天`, `aria-label="添加明天的任务"`, and plus button `aria-label="添加到明天"`.
+- Successful submit clears and refocuses the same local input; adding in Tomorrow does not jump focus back to Today.
+- Empty submit shows bucket-specific gentle messages: `先写下一件今天的事。` or `先写下一件明天的事。`.
+- Adjusted visible open-task capacity to 4 per column plus compact overflow rows so local add rows stay usable in the one-screen panel.
+- Updated panel autofocus to target the Today local add input through `data-panel-primary-input`, while preserving the existing `quick-add-autofocus` / `quick-add-focused` diagnostic event names for QA continuity.
+
+Changed files:
+- `src/features/tasks/components/column-add.tsx`
+- `src/features/tasks/components/task-column.tsx`
+- `src/features/tasks/components/task-panel.tsx`
+- `src/features/tasks/components/task-panel.test.tsx`
+- `src/app/views/panel-view.tsx`
+- `src/shared/styles/base.css`
+- `docs/agents/board.md`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+
+Verification already run:
+- `pnpm exec vitest run src/features/tasks/components/task-panel.test.tsx` passed: 3 tests covering no global quick-add, no add segmented switch, Today/Tomorrow local add behavior, same-input refocus, and bucket-specific empty feedback.
+- `pnpm typecheck` passed.
+- `pnpm check` passed: lint, typecheck, and Vitest all green; 10 test files / 37 tests.
+- `pnpm build` passed.
+- Web smoke with system Chrome at `560x600` on `http://127.0.0.1:4173/?window=panel` passed: `output/playwright/t012-column-local-add-web-smoke-result.json` has 10 checks, 0 console errors, 0 page errors.
+- Screenshot saved: `output/playwright/t012-column-local-add-panel.png`.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" cargo fmt --manifest-path src-tauri/Cargo.toml --check` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" cargo check --manifest-path src-tauri/Cargo.toml` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" pnpm exec tauri info` reached environment/package/plugin/app reporting; Rust/Cargo/rustup are installed and full Xcode remains missing.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" pnpm tauri:build` passed and rebuilt `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`.
+- `codesign --verify --deep --strict --verbose=2 /Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app` passed.
+- Current-build timestamps:
+  - `dist/index.html`: `2026-07-07 17:58:25 CST`
+  - `src-tauri/target/release/app`: `2026-07-07 17:58:43 CST`
+  - signed `.app`: `2026-07-07 17:58:43 CST`
+- `git diff --check` passed.
+
+Acceptance criteria to verify:
+- Default task panel does not show the top global `写下一件事` quick-add row.
+- Default add flow does not show or require the add-specific `今天 / 明天` segmented switch.
+- Today and Tomorrow each have their own local add input and add button.
+- Today local add creates a today task; Tomorrow local add creates a tomorrow task.
+- Successful submit clears and refocuses the same local input; Tomorrow add stays in Tomorrow.
+- Empty submit gives bucket-specific gentle feedback.
+- Existing complete / move / co-do / `接住明天` / evening review behavior remains intact.
+- Empty and light-task states remain one-screen with no default internal scrolling.
+- Tab navigation reaches both local add inputs and add buttons.
+- Native panel does not close when clicking or typing in either local add input.
+
+Known risks:
+- macOS synthetic keyboard delivery into transparent/nonstandard Tauri windows has been unreliable in prior QA. The diagnostic path now focuses the Today local input and keeps the existing diagnostic event names, but QA should perform a real native click/type pass if automation cannot prove text submission.
+- Full Xcode, Developer ID signing, notarization, and DMG packaging remain release-scope gaps outside T-012 local behavior verification.
 
 Please verify and return `QA RESULT`.

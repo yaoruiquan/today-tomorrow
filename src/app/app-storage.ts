@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { normalizeGrowthStage } from "../features/growth/growth-rules";
+import type { GrowthState } from "../features/growth/growth-types";
 import { normalizeSettings } from "../features/settings/settings-store";
 import { createDefaultAppData } from "./default-app-data";
 import type { AppData } from "./app-types";
@@ -168,11 +170,23 @@ function normalizeAppData(value: unknown, fallback: AppData): AppData {
       ...partial.panel,
       open: false
     },
-    growth: {
-      ...fallback.growth,
-      ...partial.growth
-    },
+    growth: normalizeGrowthState(partial.growth, fallback.growth),
     settings: normalizeSettings(partial.settings, fallback.settings)
+  };
+}
+
+function normalizeGrowthState(value: unknown, fallback: GrowthState): GrowthState {
+  if (!value || typeof value !== "object") return fallback;
+
+  const partial = value as Partial<GrowthState>;
+  const merged = {
+    ...fallback,
+    ...partial
+  };
+
+  return {
+    ...merged,
+    stage: normalizeGrowthStage(partial.stage, fallback.stage)
   };
 }
 

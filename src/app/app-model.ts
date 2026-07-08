@@ -600,7 +600,7 @@ export function useAppModel(): AppModel {
         },
         {
           localDate,
-          message: "明天已经接住了。"
+          message: "我接住了，明天还在。"
         }
       );
     });

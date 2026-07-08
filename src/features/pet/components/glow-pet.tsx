@@ -1,9 +1,11 @@
 import type { KeyboardEvent, MouseEvent, PointerEvent } from "react";
+import type { GrowthStage } from "../../growth/growth-types";
 import type { PetMood } from "../pet-mood";
 
 interface GlowPetProps {
   mood: PetMood;
-  growthStage: string;
+  growthStage: GrowthStage;
+  reaction?: PetReaction;
   hoverEnabled: boolean;
   quietModeActive: boolean;
   gentleReminderActive: boolean;
@@ -12,9 +14,12 @@ interface GlowPetProps {
   onPointerDown?: (event: PointerEvent<HTMLButtonElement>) => void;
 }
 
+type PetReaction = "record" | "complete" | "catch" | "review" | "coDo";
+
 export function GlowPet({
   mood,
   growthStage,
+  reaction,
   hoverEnabled,
   quietModeActive,
   gentleReminderActive,
@@ -51,6 +56,7 @@ export function GlowPet({
       className="pet-shell-button"
       data-mood={mood}
       data-growth={growthStage}
+      data-reaction={reaction}
       data-hover-enabled={hoverEnabled ? "true" : undefined}
       data-quiet={quietModeActive ? "true" : undefined}
       data-reminder={gentleReminderActive ? "true" : undefined}
@@ -64,7 +70,12 @@ export function GlowPet({
       onPointerLeave={handlePointerLeave}
     >
       <span className="pet-shell-body" aria-hidden="true">
+        <span className="pet-shell-core" />
+        <span className="pet-shell-day-night" />
+        <span className="pet-shell-holding-layer" />
         <span className="pet-shell-specks">
+          <span />
+          <span />
           <span />
           <span />
           <span />

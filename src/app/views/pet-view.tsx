@@ -12,6 +12,7 @@ import {
   isTauriRuntime,
   listenToCurrentWindowMove,
   readCurrentPetWindowPosition,
+  readCurrentPetWindowScaleFactor,
   setCurrentPetWindowPosition,
   showPanelNearPet,
   trackPetWindowPosition
@@ -101,6 +102,7 @@ export function PetView() {
     let didStartDrag = false;
     let cleanupTimer: number | undefined;
     let startWindowPosition: DesktopPosition | null = null;
+    let scaleFactor = 1;
     let lastDragScreenX = startScreenX;
     let lastDragScreenY = startScreenY;
 
@@ -111,9 +113,11 @@ export function PetView() {
       at: Date.now()
     };
     void trackPetWindowPosition();
-    void readCurrentPetWindowPosition().then((position) => {
+    void Promise.all([readCurrentPetWindowPosition(), readCurrentPetWindowScaleFactor()]).then(([position, nextScaleFactor]) => {
       if (!activePointer) return;
+      if (!position) return;
       startWindowPosition = position;
+      scaleFactor = nextScaleFactor;
 
       if (didStartDrag && startWindowPosition) {
         movePetWindowTo(lastDragScreenX, lastDragScreenY);
@@ -160,8 +164,8 @@ export function PetView() {
       if (!startWindowPosition) return;
 
       const position = {
-        x: Math.round(startWindowPosition.x + (screenX - startScreenX)),
-        y: Math.round(startWindowPosition.y + (screenY - startScreenY))
+        x: Math.round(startWindowPosition.x + (screenX - startScreenX) * scaleFactor),
+        y: Math.round(startWindowPosition.y + (screenY - startScreenY) * scaleFactor)
       };
 
       void setCurrentPetWindowPosition(position)
@@ -279,6 +283,7 @@ export function PetView() {
         <GlowPet
           mood={model.displayMood}
           growthStage={model.data.growth.stage}
+          reaction={petReactionFromMessage(model.data.pet.lastMessage, Boolean(model.activeCoDoTask))}
           hoverEnabled={model.data.settings.hoverInteractionEnabled}
           quietModeActive={model.quietModeActive}
           gentleReminderActive={model.gentleReminderActive}
@@ -304,4 +309,14 @@ export function PetView() {
 
 function positionKey(position: { x: number; y: number }): string {
   return `${Math.round(position.x)}:${Math.round(position.y)}`;
+}
+
+function petReactionFromMessage(message: string | undefined, coDoActive: boolean) {
+  if (coDoActive) return "coDo";
+  if (!message) return undefined;
+  if (message.includes("接住") || message.includes("明天已经")) return "catch";
+  if (message.includes("完成")) return "complete";
+  if (message.includes("放进") || message.includes("明天会")) return "record";
+  if (message.includes("收起来") || message.includes("收好")) return "review";
+  return undefined;
 }

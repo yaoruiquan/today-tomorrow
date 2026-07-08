@@ -1,4 +1,4 @@
-export type GrowthStage = "spark" | "glow" | "stardust" | "halo" | "dayNightWatcher";
+export type GrowthStage = "seedLight" | "smallGlow" | "starCore" | "holdingGlow" | "dayNightCore";
 
 export interface GrowthState {
   stage: GrowthStage;

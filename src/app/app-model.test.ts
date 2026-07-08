@@ -24,7 +24,7 @@ describe("app storage", () => {
     expect(data.dayCycle.lastOpenedLocalDate).toBe("2026-07-03");
     expect(data.pet.panelOpen).toBe(false);
     expect(data.panel.open).toBe(false);
-    expect(data.growth.stage).toBe("spark");
+    expect(data.growth.stage).toBe("seedLight");
   });
 
   it("normalizes persisted panel state to closed on load", () => {
@@ -51,6 +51,18 @@ describe("app storage", () => {
     const loaded = loadAppData(createDefaultAppData("2026-07-03"));
 
     expect(loaded.pet.lastMessage).toBeUndefined();
+  });
+
+  it("normalizes legacy growth stage names on load", () => {
+    const data = createDefaultAppData("2026-07-03");
+    saveAppData({
+      ...data,
+      growth: { ...data.growth, stage: "halo" as never }
+    });
+
+    const loaded = loadAppData(createDefaultAppData("2026-07-03"));
+
+    expect(loaded.growth.stage).toBe("holdingGlow");
   });
 });
 

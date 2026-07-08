@@ -478,17 +478,20 @@ export interface PanelState {
 
 ```ts
 export type GrowthStage =
-  | "spark"
-  | "glow"
-  | "stardust"
-  | "halo"
-  | "dayNightWatcher";
+  | "seedLight"
+  | "smallGlow"
+  | "starCore"
+  | "holdingGlow"
+  | "dayNightCore";
 
 export interface GrowthState {
   stage: GrowthStage;
   completedTaskCount: number;
   eveningReviewCount: number;
   eveningReviewStreak: number;
+  recordedTaskCount: number;
+  tomorrowCatchCount: number;
+  coDoSessionCount: number;
 }
 ```
 
@@ -501,6 +504,17 @@ export interface Settings {
   visibleOnAllWorkspaces: boolean;
   launchAtLogin: boolean;
   reducedMotion: boolean;
+  petThemeId: "warmGlow" | "mintFocus" | "lavenderCalm" | "blueNight" | "peachRest";
+  glowIntensity: "low" | "soft" | "bright";
+  catchTomorrowEnabled: boolean;
+  gentleRemindersEnabled: boolean;
+  hoverInteractionEnabled: boolean;
+  coDoCheckInEnabled: boolean;
+  quietMode: {
+    mode: "off" | "oneHour" | "untilTomorrow" | "always";
+    until?: string;
+  };
+  desktopPlacement: "bottomRight" | "bottomLeft" | "topRight" | "topLeft" | "lastPosition";
 }
 ```
 
@@ -512,7 +526,17 @@ export const defaultSettings: Settings = {
   alwaysOnTop: true,
   visibleOnAllWorkspaces: true,
   launchAtLogin: false,
-  reducedMotion: false
+  reducedMotion: false,
+  petThemeId: "warmGlow",
+  glowIntensity: "soft",
+  catchTomorrowEnabled: true,
+  gentleRemindersEnabled: true,
+  hoverInteractionEnabled: true,
+  coDoCheckInEnabled: true,
+  quietMode: {
+    mode: "off"
+  },
+  desktopPlacement: "bottomRight"
 };
 ```
 
@@ -683,12 +707,12 @@ return "calm";
 
 ### 8.1 MVP
 
-开发阶段可以先使用 `localStorage`，但正式 Tauri 版本建议迁移到应用数据目录下的 JSON 文件。
+Web 预览保留 `localStorage` 作为浏览器预览和原生读写失败时的兜底。当前 Tauri 版本已经使用应用数据目录下的 JSON 文件作为原生持久化主路径，并通过 Rust command 读写。
 
 文件建议：
 
 ```text
-~/Library/Application Support/TodayTomorrow/app-data.json
+~/Library/Application Support/com.todaytomorrow.desktop/app-data.json
 ```
 
 实际路径由 Tauri / Rust 层根据系统 app data 目录获取，不要在前端硬编码。
@@ -956,22 +980,25 @@ MVP 完成时必须满足：
 
 ## 16. 当前仓库的下一步
 
-当前仓库已经完成基础 MVP 迁移：
+当前仓库已经完成基础 MVP 和 T-006 至 T-010 的本地 `.app` 验证准备：
 
 - 静态原型已保留在 `prototype/static-web/`。
 - 正式应用已迁移到 Vite + React + TypeScript。
 - Tauri 已配置 `pet` / `panel` 双窗口模型。
-- 今天 / 明天任务、下班整理、日夜 rollover、宠物 mood、轻成长和 localStorage 持久化已经实现。
-- Web 预览已完成浏览器烟测，截图保存在 `output/playwright/`。
+- 今天 / 明天任务、下班整理、日夜 rollover、宠物 mood、轻成长、T-006 视觉系统、T-007 能力、T-008 丝滑交互、T-009 `接住明天` 品牌动作、T-010 可见成长形态已经实现。
+- 原生持久化已迁移到 Tauri app data JSON，并保留 Web `localStorage` fallback。
+- 系统托盘 / 应用菜单已提供打开面板、归位小光团和退出入口。
+- Web 预览和原生 `.app` 均已有自动化 / QA 记录，截图与 smoke 结果保存在 `output/playwright/`。
+- 当前可验收产物为 `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`。
 
-继续开发的优先级：
+继续开发 / 发布前优先级：
 
-1. 在具备 Rust/Cargo 的机器上完成 `pnpm tauri:dev` 和 `pnpm tauri:build` 验证。
-2. 把 MVP 持久化从 localStorage 迁移到 Tauri app data JSON 文件。
-3. 增加系统托盘、基础菜单和开机启动设置。
-4. 根据 QA 结果修复桌面窗口、边界定位和下班整理细节。
+1. 将当前完整项目状态交给 QA Verifier 做最终全量验收。
+2. 若进入正式分发，补齐 full Xcode、Developer ID 签名、notarization 和 DMG 打包链路。
+3. 若需要开机启动，接入 macOS login item / autostart 能力并补对应设置 UI。
+4. 若 QA 要求更强 native 自动化，继续扩展 `ui-diagnostics.json` 或专用测试命令来证明原生输入提交 / refocus。
 
 当前本机验证限制：
 
-- `rustc`、`cargo`、`rustup` 未安装。
-- 因此 Rust/Tauri 编译暂未验证，交给 QA 时必须作为已知风险说明。
+- `rustc`、`cargo`、`rustup` 已安装，`pnpm tauri:build` 可生成 ad-hoc signed macOS `.app`。
+- 完整 Xcode 未安装，因此 Apple notarization、Developer ID 正式签名和 DMG 分发仍未验证，交给 QA / CEO 时必须作为发布风险说明。

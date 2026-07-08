@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow, LogicalPosition } from "@tauri-apps/api/window";
+import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
 import type { DesktopPlacement, DesktopPosition } from "./desktop-window-types";
 
 declare global {
@@ -18,12 +18,6 @@ export async function showPanelNearPet(): Promise<boolean> {
   return true;
 }
 
-export async function startNativePetWindowDrag(): Promise<boolean> {
-  if (!isTauriRuntime()) return false;
-  await getCurrentWindow().startDragging();
-  return true;
-}
-
 export async function trackPetWindowPosition(): Promise<boolean> {
   if (!isTauriRuntime()) return false;
   await invoke("track_pet_window_position");
@@ -34,12 +28,17 @@ export async function readCurrentPetWindowPosition(): Promise<DesktopPosition | 
   if (!isTauriRuntime()) return null;
 
   const window = getCurrentWindow();
-  const [position, scaleFactor] = await Promise.all([window.outerPosition(), window.scaleFactor()]);
+  const position = await window.outerPosition();
 
   return {
-    x: Math.round(position.x / scaleFactor),
-    y: Math.round(position.y / scaleFactor)
+    x: Math.round(position.x),
+    y: Math.round(position.y)
   };
+}
+
+export async function readCurrentPetWindowScaleFactor(): Promise<number> {
+  if (!isTauriRuntime()) return 1;
+  return getCurrentWindow().scaleFactor();
 }
 
 export async function hidePanelWindow(): Promise<boolean> {
@@ -66,9 +65,18 @@ export async function placePetWindow(placement: DesktopPlacement): Promise<boole
   return true;
 }
 
+export async function recordUiDiagnostic(event: string, details?: Record<string, unknown>): Promise<boolean> {
+  if (!isTauriRuntime()) return false;
+  await invoke("record_ui_diagnostic", {
+    event,
+    details: details ?? {}
+  });
+  return true;
+}
+
 export async function setCurrentPetWindowPosition(position: DesktopPosition): Promise<boolean> {
   if (!isTauriRuntime()) return false;
-  await getCurrentWindow().setPosition(new LogicalPosition(Math.round(position.x), Math.round(position.y)));
+  await getCurrentWindow().setPosition(new PhysicalPosition(Math.round(position.x), Math.round(position.y)));
   return true;
 }
 
@@ -80,14 +88,12 @@ export async function listenToCurrentWindowMove(
   const window = getCurrentWindow();
 
   return window.onMoved(({ payload }) => {
-    void window.scaleFactor().then((scaleFactor) => {
-      const position = {
-        x: Math.round(payload.x / scaleFactor),
-        y: Math.round(payload.y / scaleFactor)
-      };
+    const position = {
+      x: Math.round(payload.x),
+      y: Math.round(payload.y)
+    };
 
-      onMove(position);
-      void savePetPosition(position);
-    });
+    onMove(position);
+    void savePetPosition(position);
   });
 }

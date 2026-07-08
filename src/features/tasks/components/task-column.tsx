@@ -1,8 +1,9 @@
 import { taskCopy } from "../task-copy";
 import type { Task, TaskBucket } from "../task-types";
+import { ColumnAdd } from "./column-add";
 import { TaskItem } from "./task-item";
 
-const MAX_VISIBLE_OPEN_TASKS = 5;
+const MAX_VISIBLE_OPEN_TASKS = 4;
 
 interface TaskColumnProps {
   bucket: TaskBucket;
@@ -12,6 +13,9 @@ interface TaskColumnProps {
   openCount: number;
   tasks: Task[];
   activeCoDoTaskId?: string;
+  receiving?: boolean;
+  onAdd: (title: string, bucket: TaskBucket) => void;
+  onEmptySubmit: (bucket: TaskBucket) => void;
   onToggle: (id: string) => void;
   onMove: (id: string, bucket: TaskBucket) => void;
   onStartCoDo: (id: string) => void;
@@ -26,6 +30,9 @@ export function TaskColumn({
   openCount,
   tasks,
   activeCoDoTaskId,
+  receiving = false,
+  onAdd,
+  onEmptySubmit,
   onToggle,
   onMove,
   onStartCoDo,
@@ -43,6 +50,7 @@ export function TaskColumn({
   return (
     <section
       className={`task-column task-column-${variant}`}
+      data-receiving={receiving ? "true" : undefined}
       aria-labelledby={`${bucket}-title`}
     >
       <div className="column-head">
@@ -54,6 +62,15 @@ export function TaskColumn({
           {openCount}
         </span>
       </div>
+      <ColumnAdd
+        bucket={bucket}
+        placeholder={bucket === "today" ? "添加今天的事" : "放到明天"}
+        inputLabel={bucket === "today" ? "添加今天的任务" : "添加明天的任务"}
+        buttonLabel={bucket === "today" ? "添加到今天" : "添加到明天"}
+        autoFocusTarget={bucket === "today"}
+        onAdd={onAdd}
+        onEmptySubmit={onEmptySubmit}
+      />
       <ul className="task-list">
         {visibleTasks.length ? (
           <>
