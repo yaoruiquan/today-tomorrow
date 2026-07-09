@@ -163,7 +163,8 @@ function normalizeAppData(value: unknown, fallback: AppData): AppData {
       ...fallback.pet,
       ...partial.pet,
       panelOpen: false,
-      lastMessage: undefined
+      lastMessage: undefined,
+      lastGrowthEvent: undefined
     },
     panel: {
       ...fallback.panel,
@@ -195,5 +196,5 @@ function hasTransientLaunchState(value: unknown): boolean {
 
   const partial = value as Partial<AppData>;
 
-  return Boolean(partial.pet?.lastMessage || partial.pet?.panelOpen || partial.panel?.open);
+  return Boolean(partial.pet?.lastMessage || partial.pet?.lastGrowthEvent || partial.pet?.panelOpen || partial.panel?.open);
 }

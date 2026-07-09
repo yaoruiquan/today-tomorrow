@@ -65,6 +65,27 @@ describe("TaskPanel column-local add", () => {
     });
   });
 
+  it("renders long column task lists so the column can scroll", async () => {
+    render(<Harness />);
+
+    const todayColumn = screen.getByRole("region", { name: "今天" });
+    const todayInput = within(todayColumn).getByLabelText("添加今天的任务") as HTMLInputElement;
+    const addTodayButton = within(todayColumn).getByRole("button", { name: "添加到今天" });
+    const taskTitles = Array.from({ length: 7 }, (_, index) => `长清单任务 ${index + 1}`);
+
+    for (const title of taskTitles) {
+      fireEvent.change(todayInput, { target: { value: title } });
+      fireEvent.click(addTodayButton);
+    }
+
+    await waitFor(() => {
+      for (const title of taskTitles) {
+        expect(within(todayColumn).getByText(title)).toBeInTheDocument();
+      }
+    });
+    expect(within(todayColumn).queryByText(/先放在后面/)).not.toBeInTheDocument();
+  });
+
   it("shows bucket-specific gentle feedback on empty submit", async () => {
     render(<Harness />);
 
@@ -77,5 +98,49 @@ describe("TaskPanel column-local add", () => {
     fireEvent.submit(within(tomorrowColumn).getByLabelText("添加明天的任务").closest("form")!);
 
     await waitFor(() => expect(readModel().data.pet.lastMessage).toBe("先写下一件明天的事。"));
+  });
+
+  it("lets users delete a task from the main planning panel", async () => {
+    render(<Harness />);
+
+    const todayInput = screen.getByLabelText("添加今天的任务") as HTMLInputElement;
+    fireEvent.change(todayInput, { target: { value: "可以删掉的事" } });
+    fireEvent.click(screen.getByRole("button", { name: "添加到今天" }));
+
+    expect(await screen.findByText("可以删掉的事")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "删除任务" }));
+
+    await waitFor(() => expect(screen.queryByText("可以删掉的事")).not.toBeInTheDocument());
+    expect(readModel().todayTasks).toHaveLength(0);
+    expect(readModel().data.tasks[0]).toMatchObject({
+      title: "可以删掉的事",
+      status: "abandoned"
+    });
+    expect(readModel().data.pet.lastMessage).toBe("这件事已经放下。");
+  });
+
+  it("lets users edit an existing task title from the task row", async () => {
+    render(<Harness />);
+
+    const todayInput = screen.getByLabelText("添加今天的任务") as HTMLInputElement;
+    fireEvent.change(todayInput, { target: { value: "需要修改的事" } });
+    fireEvent.click(screen.getByRole("button", { name: "添加到今天" }));
+
+    expect(await screen.findByText("需要修改的事")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "编辑任务：需要修改的事" }));
+    const editInput = screen.getByLabelText("编辑任务标题") as HTMLInputElement;
+    fireEvent.change(editInput, { target: { value: "已经改好的事" } });
+    fireEvent.submit(editInput.closest("form")!);
+
+    expect(await screen.findByText("已经改好的事")).toBeInTheDocument();
+    expect(screen.queryByText("需要修改的事")).not.toBeInTheDocument();
+    expect(readModel().todayTasks[0]).toMatchObject({
+      title: "已经改好的事",
+      bucket: "today",
+      status: "open"
+    });
+    expect(readModel().data.pet.lastMessage).toBe("这件事改好了。");
   });
 });

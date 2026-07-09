@@ -1,6 +1,6 @@
 use std::{
     fs,
-    sync::{mpsc, Mutex},
+    sync::{mpsc, LazyLock, Mutex},
     thread,
     time::{Duration, Instant},
 };
@@ -32,9 +32,14 @@ const PET_NATIVE_DRAG_THRESHOLD_PT: f64 = 4.0;
 #[cfg(target_os = "macos")]
 const PET_NATIVE_CLICK_MAX_MS: u128 = 900;
 #[cfg(target_os = "macos")]
+const PET_PANEL_REOPEN_SUPPRESS_MS: u128 = 650;
+#[cfg(target_os = "macos")]
 const CG_EVENT_SOURCE_COMBINED_SESSION_STATE: i32 = 0;
 #[cfg(target_os = "macos")]
 const MACOS_ESCAPE_KEY_CODE: u16 = 53;
+
+#[cfg(target_os = "macos")]
+static RECENT_PET_PANEL_HIDE: LazyLock<Mutex<Option<Instant>>> = LazyLock::new(|| Mutex::new(None));
 
 #[derive(Default)]
 pub struct PetPositionState(pub Mutex<Option<SavedPetPosition>>);
@@ -76,6 +81,49 @@ pub fn show_panel_near_pet(app: AppHandle) -> Result<(), String> {
     {
         return show_panel_near_pet_inner(&app);
     }
+}
+
+#[tauri::command]
+pub fn toggle_panel_near_pet(app: AppHandle) -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        return toggle_panel_near_pet_via_main_thread(app);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        return toggle_panel_near_pet_inner(&app);
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn toggle_panel_near_pet_via_main_thread(app: AppHandle) -> Result<bool, String> {
+    let (sender, receiver) = mpsc::channel();
+    let app_for_main = app.clone();
+
+    app.run_on_main_thread(move || {
+        let _ = sender.send(toggle_panel_near_pet_inner(&app_for_main));
+    })
+    .map_err(|error| error.to_string())?;
+
+    receiver
+        .recv_timeout(Duration::from_secs(2))
+        .map_err(|error| error.to_string())?
+}
+
+fn toggle_panel_near_pet_inner(app: &AppHandle) -> Result<bool, String> {
+    if native_panel_visible(app) {
+        mark_recent_pet_panel_hide();
+        hide_panel(app.clone())?;
+        return Ok(false);
+    }
+
+    if recently_hid_panel_from_pet_click() {
+        return Ok(false);
+    }
+
+    show_panel_near_pet_inner(app)?;
+    Ok(true)
 }
 
 #[cfg(target_os = "macos")]
@@ -196,7 +244,8 @@ fn get_or_create_panel_window(app: &AppHandle) -> Result<WebviewWindow, String> 
     .traffic_light_position(Position::Physical(PhysicalPosition { x: -100, y: -100 }))
     .always_on_top(false)
     .visible(false)
-    .transparent(false)
+    .transparent(true)
+    .shadow(false)
     .skip_taskbar(false)
     .focusable(true)
     .accept_first_mouse(true)
@@ -374,7 +423,7 @@ fn run_native_pet_input_polling(app: AppHandle) {
             } else if left_down_seen && left_up_seen {
                 if let Some(cursor) = cursor {
                     if native_pet_hit_test_state(&pet, cursor).is_some() {
-                        open_panel_from_native_pet_click(&app);
+                        toggle_panel_from_native_pet_click(&app);
                     }
                 }
             }
@@ -414,6 +463,11 @@ fn handle_native_panel_global_close(
     let clicked_inside_pet = app
         .get_webview_window("pet")
         .is_some_and(|pet| native_pet_hit_test_state(&pet, cursor).is_some());
+
+    if clicked_inside_pet {
+        toggle_panel_from_native_pet_click(app);
+        return;
+    }
 
     if !clicked_inside_panel && !clicked_inside_pet {
         hide_panel_from_native_interaction(app);
@@ -467,19 +521,43 @@ fn finish_native_pet_pointer_interaction(app: &AppHandle, state: NativePetPointe
         return;
     }
 
-    open_panel_from_native_pet_click(app);
+    toggle_panel_from_native_pet_click(app);
 }
 
 #[cfg(target_os = "macos")]
-fn open_panel_from_native_pet_click(app: &AppHandle) {
+fn toggle_panel_from_native_pet_click(app: &AppHandle) {
     let app_for_panel = app.clone();
     if let Err(error) = app.run_on_main_thread(move || {
-        if let Err(error) = show_panel_near_pet_inner(&app_for_panel) {
-            eprintln!("failed to open panel from native pet click: {error}");
+        if let Err(error) = toggle_panel_near_pet_inner(&app_for_panel) {
+            eprintln!("failed to toggle panel from native pet click: {error}");
         }
     }) {
         eprintln!("failed to schedule native pet click: {error}");
     }
+}
+
+#[cfg(target_os = "macos")]
+fn mark_recent_pet_panel_hide() {
+    if let Ok(mut recent_hide) = RECENT_PET_PANEL_HIDE.lock() {
+        *recent_hide = Some(Instant::now());
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn mark_recent_pet_panel_hide() {}
+
+#[cfg(target_os = "macos")]
+fn recently_hid_panel_from_pet_click() -> bool {
+    RECENT_PET_PANEL_HIDE
+        .lock()
+        .ok()
+        .and_then(|recent_hide| *recent_hide)
+        .is_some_and(|hidden_at| hidden_at.elapsed().as_millis() < PET_PANEL_REOPEN_SUPPRESS_MS)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn recently_hid_panel_from_pet_click() -> bool {
+    false
 }
 
 #[cfg(target_os = "macos")]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addTask, moveTask, toggleTaskDone } from "./task-reducer";
+import { abandonTask, addTask, moveTask, renameTask, toggleTaskDone } from "./task-reducer";
 import { openTaskCount } from "./task-selectors";
 import type { Task } from "./task-types";
 
@@ -55,6 +55,36 @@ describe("task reducer", () => {
 
     expect(tasks[0].bucket).toBe("tomorrow");
     expect(tasks[0].status).toBe("open");
+  });
+
+  it("renames a task title without changing its bucket or status", () => {
+    const tasks = renameTask([baseTask], "task-1", "  改过的事  ", "2026-07-03T10:16:00.000Z");
+
+    expect(tasks[0]).toMatchObject({
+      id: "task-1",
+      title: "改过的事",
+      bucket: "today",
+      status: "open",
+      updatedAt: "2026-07-03T10:16:00.000Z"
+    });
+  });
+
+  it("keeps a task unchanged when renaming to an empty title", () => {
+    const tasks = renameTask([baseTask], "task-1", "   ", "2026-07-03T10:16:00.000Z");
+
+    expect(tasks[0]).toBe(baseTask);
+  });
+
+  it("abandons a task without removing its history", () => {
+    const tasks = abandonTask([baseTask], "task-1", "2026-07-03T10:18:00.000Z");
+
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]).toMatchObject({
+      id: "task-1",
+      status: "abandoned",
+      abandonedAt: "2026-07-03T10:18:00.000Z",
+      updatedAt: "2026-07-03T10:18:00.000Z"
+    });
   });
 
   it("counts only open tasks in a bucket", () => {

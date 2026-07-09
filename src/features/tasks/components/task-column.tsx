@@ -3,8 +3,6 @@ import type { Task, TaskBucket } from "../task-types";
 import { ColumnAdd } from "./column-add";
 import { TaskItem } from "./task-item";
 
-const MAX_VISIBLE_OPEN_TASKS = 4;
-
 interface TaskColumnProps {
   bucket: TaskBucket;
   title: string;
@@ -18,6 +16,8 @@ interface TaskColumnProps {
   onEmptySubmit: (bucket: TaskBucket) => void;
   onToggle: (id: string) => void;
   onMove: (id: string, bucket: TaskBucket) => void;
+  onRename: (id: string, title: string) => void;
+  onDelete: (id: string) => void;
   onStartCoDo: (id: string) => void;
   onStopCoDo: () => void;
 }
@@ -35,17 +35,12 @@ export function TaskColumn({
   onEmptySubmit,
   onToggle,
   onMove,
+  onRename,
+  onDelete,
   onStartCoDo,
   onStopCoDo
 }: TaskColumnProps) {
-  const openTasks = tasks.filter((task) => task.status === "open");
-  const completedTasks = tasks.filter((task) => task.status === "done");
-  const visibleOpenTasks = openTasks.slice(0, MAX_VISIBLE_OPEN_TASKS);
-  const remainingSlots = Math.max(MAX_VISIBLE_OPEN_TASKS - visibleOpenTasks.length, 0);
-  const visibleCompletedTasks = completedTasks.slice(0, remainingSlots);
-  const visibleTasks = [...visibleOpenTasks, ...visibleCompletedTasks];
-  const hiddenOpenCount = Math.max(openTasks.length - visibleOpenTasks.length, 0);
-  const hiddenCompletedCount = Math.max(completedTasks.length - visibleCompletedTasks.length, 0);
+  const visibleTasks = tasks.filter((task) => task.status !== "abandoned");
 
   return (
     <section
@@ -73,29 +68,19 @@ export function TaskColumn({
       />
       <ul className="task-list">
         {visibleTasks.length ? (
-          <>
-            {visibleTasks.map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                isCoDoing={activeCoDoTaskId === task.id}
-                onToggle={onToggle}
-                onMove={onMove}
-                onStartCoDo={onStartCoDo}
-                onStopCoDo={onStopCoDo}
-              />
-            ))}
-            {hiddenOpenCount ? (
-              <li className="overflow-row">
-                {bucket === "today"
-                  ? `还有 ${hiddenOpenCount} 件，先放在后面`
-                  : `明天还放着 ${hiddenOpenCount} 件`}
-              </li>
-            ) : null}
-            {!hiddenOpenCount && hiddenCompletedCount ? (
-              <li className="overflow-row">{`还有 ${hiddenCompletedCount} 件已完成`}</li>
-            ) : null}
-          </>
+          visibleTasks.map((task) => (
+            <TaskItem
+              key={task.id}
+              task={task}
+              isCoDoing={activeCoDoTaskId === task.id}
+              onToggle={onToggle}
+              onMove={onMove}
+              onRename={onRename}
+              onDelete={onDelete}
+              onStartCoDo={onStartCoDo}
+              onStopCoDo={onStopCoDo}
+            />
+          ))
         ) : (
           <li className="empty">{bucket === "today" ? taskCopy.emptyToday : taskCopy.emptyTomorrow}</li>
         )}

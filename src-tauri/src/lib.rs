@@ -19,6 +19,7 @@ pub fn run() {
             window::recenter_pet_window,
             window::place_pet_window,
             window::show_panel_near_pet,
+            window::toggle_panel_near_pet,
             window::hide_panel,
             window::save_pet_position,
             window::restore_pet_position,

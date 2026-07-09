@@ -62,6 +62,21 @@ export function moveTask(tasks: Task[], id: string, bucket: TaskBucket, now: str
   });
 }
 
+export function renameTask(tasks: Task[], id: string, title: string, now: string): Task[] {
+  const trimmed = title.trim();
+  if (!trimmed) return tasks;
+
+  return tasks.map((task) => {
+    if (task.id !== id || task.title === trimmed) return task;
+
+    return {
+      ...task,
+      title: trimmed,
+      updatedAt: now
+    };
+  });
+}
+
 export function abandonTask(tasks: Task[], id: string, now: string): Task[] {
   return tasks.map((task) => {
     if (task.id !== id) return task;

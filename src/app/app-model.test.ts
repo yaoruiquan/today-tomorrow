@@ -53,6 +53,28 @@ describe("app storage", () => {
     expect(loaded.pet.lastMessage).toBeUndefined();
   });
 
+  it("does not restore transient growth events on load", () => {
+    const data = createDefaultAppData("2026-07-03");
+    saveAppData({
+      ...data,
+      pet: {
+        ...data.pet,
+        lastGrowthEvent: {
+          id: "growth-1",
+          type: "catchTomorrow",
+          at: "2026-07-03T10:00:00.000Z",
+          stageBefore: "seedLight",
+          stageAfter: "smallGlow",
+          stageChanged: true
+        }
+      }
+    });
+
+    const loaded = loadAppData(createDefaultAppData("2026-07-03"));
+
+    expect(loaded.pet.lastGrowthEvent).toBeUndefined();
+  });
+
   it("normalizes legacy growth stage names on load", () => {
     const data = createDefaultAppData("2026-07-03");
     saveAppData({
@@ -100,9 +122,15 @@ describe("app model", () => {
     });
     expect(readModel().data.panel.mode).toBe("tasks");
     expect(readModel().data.growth.eveningReviewCount).toBe(1);
+    expect(readModel().data.pet.lastGrowthEvent).toMatchObject({
+      type: "catchTomorrow",
+      stageBefore: "seedLight",
+      stageAfter: "starCore",
+      stageChanged: true
+    });
   });
 
-  it("finishes review when the last open today task is handled one by one", () => {
+  it("finishes review with milestone copy when the last open today task advances growth", () => {
     render(React.createElement(ModelProbe));
 
     act(() => readModel().addTaskToBucket("逐项收尾", "today"));
@@ -113,7 +141,13 @@ describe("app model", () => {
 
     expect(readModel().data.panel.mode).toBe("tasks");
     expect(readModel().data.growth.eveningReviewCount).toBe(1);
-    expect(readModel().data.pet.lastMessage).toBe("今天可以收起来了。");
+    expect(readModel().data.pet.lastMessage).toBe("小光团好像长大了一点。");
+    expect(readModel().data.pet.lastGrowthEvent).toMatchObject({
+      type: "eveningReview",
+      stageBefore: "seedLight",
+      stageAfter: "smallGlow",
+      stageChanged: true
+    });
   });
 
   it("does not count the same local date review twice", () => {
@@ -171,6 +205,33 @@ describe("app model", () => {
     expect(readModel().todayOpenCount).toBe(0);
     expect(readModel().tomorrowOpenCount).toBe(1);
     expect(readModel().data.growth.tomorrowCatchCount).toBe(1);
+    expect(readModel().data.pet.lastGrowthEvent).toMatchObject({
+      type: "catchTomorrow"
+    });
+    expect(readModel().data.pet.lastMessage).toBe("身体里多了一点星尘光。");
+  });
+
+  it("records explicit growth events instead of relying on pet message text", () => {
+    render(React.createElement(ModelProbe));
+
+    act(() => readModel().addTaskToBucket("第一件", "today"));
+    expect(readModel().data.pet.lastGrowthEvent).toMatchObject({
+      type: "recordToday",
+      stageBefore: "seedLight",
+      stageAfter: "seedLight",
+      stageChanged: false
+    });
+
+    const taskId = readModel().todayTasks[0].id;
+    act(() => readModel().toggleTask(taskId));
+
+    expect(readModel().data.pet.lastGrowthEvent).toMatchObject({
+      type: "completeTask",
+      stageBefore: "seedLight",
+      stageAfter: "smallGlow",
+      stageChanged: true
+    });
+    expect(readModel().data.pet.lastMessage).toBe("小光团好像长大了一点。");
   });
 
   it("keeps only one active co-do task and clears it on completion", () => {

@@ -316,7 +316,43 @@ pnpm tauri:build
 - 不新增全局命令入口作为本任务的默认路径。
 - 不新增设置项来控制添加位置；列内添加是默认体验。
 
-## 13. 截图参考
+## 13. T-013 成长因果与里程碑验收项
+
+### 13.1 明确成长事件
+
+- 添加今天任务会产生 `recordToday` 成长事件。
+- 添加明天任务会产生 `recordTomorrow` 成长事件。
+- 完成任务会产生 `completeTask` 成长事件。
+- 确认 `接住明天` 会产生 `catchTomorrow` 成长事件。
+- 完成晚间整理会产生 `eveningReview` 成长事件。
+- 开始陪做会产生 `coDo` 成长事件。
+
+### 13.2 宠物反应
+
+- 宠物反应由成长事件类型驱动，不依赖宠物文案字符串匹配。
+- `recordToday` / `recordTomorrow` 触发记录类本体反应。
+- `completeTask` 触发内部光点 / core 变亮反应。
+- `catchTomorrow` 触发最明显的 holding-layer / 接住反应。
+- `eveningReview` 触发安定整理类反应。
+- `coDo` 触发更专注 / 更安静的陪做反应。
+
+### 13.3 里程碑反馈
+
+- 当成长事件导致 stage 变化时，宠物消息显示短里程碑文案。
+- 进入 `smallGlow` 可显示 `小光团好像长大了一点。`
+- 进入 `starCore` 可显示 `身体里多了一点星尘光。`
+- 进入 `holdingGlow` 可显示 `它更会接住明天了。`
+- 进入 `dayNightCore` 可显示 `它把这些天的光都记住了。`
+- 未发生 stage 变化时，保留原动作反馈文案。
+
+### 13.4 持久化和边界
+
+- `lastGrowthEvent` 不在 app relaunch 后恢复。
+- 旧阶段名仍可被安全迁移，例如 `halo` 迁移为 `holdingGlow`。
+- 不出现 XP、等级数字、成长进度条、连续打卡或成长失败。
+- 现有可见成长阶段、主题、glow intensity 和 `接住明天` 任务移动行为保持不变。
+
+## 14. 截图参考
 
 开发侧已生成以下烟测截图：
 
@@ -326,7 +362,7 @@ pnpm tauri:build
 - `output/playwright/mvp-panel-after-review.png`
 - `output/playwright/mvp-panel-mobile-reference.png`
 
-## 14. 已知风险
+## 15. 已知风险
 
 - 当前机器已安装 Rust/Cargo/rustup，并已完成 `pnpm tauri:build`。完整 Xcode 仍缺失，因此未验证 Apple notarization 或正式分发签名。
 - macOS DMG target 暂未作为默认产物。当前可验收产物为 `src-tauri/target/release/bundle/macos/今天明天.app`。

@@ -1796,3 +1796,123 @@ Known risks:
 - Full Xcode, Developer ID signing, notarization, and DMG packaging remain release-scope gaps outside T-012 local behavior verification.
 
 Please verify and return `QA RESULT`.
+
+## 2026-07-08 16:31 CST - Product Developer -> QA Verifier
+
+DEVELOPMENT -> QA
+Product: 今天明天
+Task ID: T-013
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+Subject: Ready for verification
+
+Implemented:
+- Added the implementation-ready design/development note `docs/design/t-013-growth-causality-and-milestones.md`.
+- Added explicit transient `GrowthEvent` / `GrowthEventType` model types for growth-causing user actions.
+- Added `pet.lastGrowthEvent` as a transient UI signal that records the latest growth action, stage-before, stage-after, points added, and timestamp.
+- Cleared `lastGrowthEvent` during app-data normalization so old transient pet reactions do not replay after relaunch.
+- Updated task and pet model actions so adding today tasks, adding tomorrow tasks, completing tasks, `接住明天`, evening review, and co-do can create explicit growth events.
+- Added short milestone copy when a growth event causes the pet to enter a new stage:
+  - `小光团好像长大了一点。`
+  - `身体里多了一点星尘光。`
+  - `它更会接住明天了。`
+  - `它把这些天的光都记住了。`
+- Updated pet reaction selection to use the explicit growth event type instead of parsing `lastMessage` text.
+- Remounts the collapsed `GlowPet` visual on new growth-event ids so the matching reaction animation can replay for a fresh user action.
+- Updated product spec, QA checklist, and agent board for T-013.
+
+Changed files:
+- `docs/design/t-013-growth-causality-and-milestones.md`
+- `docs/product-spec.md`
+- `docs/qa-checklist.md`
+- `docs/agents/board.md`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+- `src/features/growth/growth-types.ts`
+- `src/app/app-types.ts`
+- `src/app/app-storage.ts`
+- `src/app/app-model.ts`
+- `src/app/views/pet-view.tsx`
+- `src/app/app-model.test.ts`
+
+Verification already run:
+- `pnpm typecheck` passed.
+- `pnpm test -- src/app/app-model.test.ts src/features/growth/growth-rules.test.ts src/features/pet/components/glow-pet.test.tsx` passed.
+- `pnpm check` passed: lint, typecheck, and Vitest all green; 10 test files / 39 tests.
+- `pnpm build` passed.
+- `git diff --check` passed for the T-013 changed files.
+
+Acceptance criteria to verify:
+- Adding a Today task produces a `recordToday` growth event and a record-style pet body reaction.
+- Adding a Tomorrow task produces a `recordTomorrow` growth event and a tomorrow-oriented pet body reaction.
+- Completing a task produces a `completeTask` growth event and completion-style pet body reaction.
+- Confirming `接住明天` produces a `catchTomorrow` growth event and the strongest holding / tomorrow-catching body reaction.
+- Evening review produces an `eveningReview` growth event when it is the action causing the growth update.
+- Starting co-do produces a `coDo` growth event when it creates a new co-do state.
+- Growth reactions are driven by `lastGrowthEvent.type`, not by matching Chinese copy inside `lastMessage`.
+- When an event changes the pet stage, milestone copy appears briefly and remains non-pressuring.
+- Relaunching the app does not replay stale `lastGrowthEvent` reactions.
+- The product still has no XP bar, score, punitive streak, shame language, projects, tags, priorities, or dashboard-style expansion.
+- Visual QA should confirm the pet still reads as self-emissive body growth: light comes from body/core/edge layers, not a large detached halo.
+
+Known risks:
+- This pass makes growth causality explicit and testable, but it does not implement a full future multi-channel body-growth system.
+- `src/app/views/pet-view.tsx` already had active T-010/T-011 visual work in the tree before T-013; QA should judge the combined current visual output rather than isolating this pass as a separate visual redesign.
+- Native signed `.app` rebuild was not rerun for T-013 in this handoff. The verified checks are source-level, unit/component-level, and project-level web checks through `pnpm check`.
+
+Please verify and return `QA RESULT`.
+
+## 2026-07-09 18:31 CST - Product Developer -> QA Verifier
+
+DEVELOPMENT -> QA
+Product: 今天明天
+Task ID: T-012
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+Subject: Ready for verification - task edit/delete and scrollable long lists
+
+Implemented:
+- Added row-level task title editing from the main planning panel.
+- Added row-level delete / abandon behavior from the main planning panel.
+- Replaced the four-task compact overflow truncation with full rendering of all non-abandoned tasks inside each column.
+- Made `.task-list` a column-local vertical scroll container so long Today/Tomorrow lists can be scrolled without moving the panel header, add row, evening strip, or footer controls.
+- Rebuilt a local signed app, generated a DMG, installed the DMG-mounted app to `/Applications/今天明天.app`, and launched it for the user.
+
+Changed files:
+- `src/features/tasks/components/task-column.tsx`
+- `src/features/tasks/components/task-item.tsx`
+- `src/features/tasks/components/task-panel.test.tsx`
+- `src/features/tasks/task-reducer.ts`
+- `src/features/tasks/task-reducer.test.ts`
+- `src/app/app-model.ts`
+- `src/shared/styles/base.css`
+- `docs/agents/board.md`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+
+Verification already run:
+- `pnpm exec vitest run src/features/tasks/components/task-panel.test.tsx` passed: 6 tests.
+- `pnpm check` passed: lint, typecheck, and Vitest all green; 10 test files / 45 tests.
+- `pnpm build` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" cargo fmt --manifest-path src-tauri/Cargo.toml --check` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" cargo check --manifest-path src-tauri/Cargo.toml` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" pnpm tauri build --bundles dmg` passed.
+- `hdiutil verify src-tauri/target/release/bundle/dmg/今天明天_0.1.0_aarch64.dmg` passed.
+- DMG-mounted `/tmp/.../今天明天.app` passed `codesign --verify --deep --strict --verbose=2`.
+- Installed from DMG to `/Applications/今天明天.app`; running process observed as `/Applications/今天明天.app/Contents/MacOS/app`.
+- Browser scroll smoke with system Chrome at `560x600` passed: `output/playwright/task-list-scroll-fix-result.json` has 6 checks, 0 failures, 0 console errors, and 0 page errors. The Today task list rendered 12 task rows with 0 overflow rows, `clientHeight=204`, `scrollHeight=526`, and `scrollTop` moved from 0 to 322 after programmatic scroll.
+- Screenshot saved: `output/playwright/task-list-scroll-fix.png`.
+- `git diff --check` passed.
+
+Acceptance criteria to verify:
+- Users can edit a task title from the task row and save the new title.
+- Users can delete / abandon a task from the task row and it disappears from the active column.
+- A Today or Tomorrow column with more tasks than fit visually can scroll downward.
+- Long task lists render actual task rows instead of hiding rows behind `还有 N 件` compact overflow copy.
+- Column add inputs, complete/move/co-do actions, `接住明天`, and evening review remain usable.
+- The panel remains one-screen overall; only the task list area should scroll.
+
+Known risks:
+- The generated DMG and installed app are ad-hoc signed and not notarized. Developer ID signing/notarization remain release-distribution scope.
+
+Please verify and return `QA RESULT`.

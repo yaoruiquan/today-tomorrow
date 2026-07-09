@@ -118,6 +118,12 @@ body[data-window="pet"] #root {
   background: transparent;
 }
 
+html[data-window="panel"],
+body[data-window="panel"],
+body[data-window="panel"] #root {
+  background: transparent;
+}
+
 body[data-window="panel"] {
   overflow: hidden;
 }
@@ -601,7 +607,8 @@ body[data-window="pet"] .pet-window {
   height: 100vh;
   place-items: center;
   overflow: hidden;
-  padding: 4px;
+  padding: 8px;
+  background: transparent;
 }
 
 .panel-kicker {
@@ -617,15 +624,18 @@ body[data-window="pet"] .pet-window {
   grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   gap: 8px;
   width: min(560px, 100%);
-  height: min(592px, calc(100vh - 8px));
+  height: min(584px, calc(100vh - 16px));
   min-height: 0;
   padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 26px;
+  border: 1px solid rgba(52, 64, 51, 0.1);
+  border-radius: 34px;
   background:
-    linear-gradient(145deg, rgba(255, 253, 247, 0.92), rgba(250, 247, 238, 0.84)),
+    linear-gradient(145deg, rgba(255, 253, 247, 0.95), rgba(250, 247, 238, 0.88)),
     var(--paper-soft);
-  box-shadow: var(--shadow);
+  box-shadow:
+    0 22px 48px rgba(65, 72, 61, 0.16),
+    0 7px 18px rgba(65, 72, 61, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74);
   backdrop-filter: blur(22px);
   overflow: hidden;
   isolation: isolate;
@@ -886,6 +896,7 @@ body[data-window="pet"] .pet-window {
 .column-add-button,
 .check-button,
 .move-button,
+.delete-button,
 .co-do-button,
 .icon-action {
   display: grid;
@@ -1048,6 +1059,31 @@ body[data-window="pet"] .pet-window {
 
 .task-list {
   min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 3px;
+  padding-bottom: 2px;
+  scrollbar-color: color-mix(in srgb, var(--theme-selected-bg) 28%, transparent) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.task-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.task-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.task-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--theme-selected-bg) 22%, transparent);
+}
+
+.task-list::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--theme-selected-bg) 34%, transparent);
 }
 
 .task-item,
@@ -1061,7 +1097,7 @@ body[data-window="pet"] .pet-window {
 }
 
 .task-item {
-  grid-template-columns: 26px minmax(0, 1fr) 42px 26px;
+  grid-template-columns: 26px minmax(0, 1fr) 42px 26px 26px;
   gap: 6px;
   height: 40px;
   overflow: hidden;
@@ -1069,7 +1105,8 @@ body[data-window="pet"] .pet-window {
 }
 
 .task-item .co-do-button,
-.task-item .move-button {
+.task-item .move-button,
+.task-item .delete-button {
   opacity: 0;
   transform: translateX(4px);
   transition:
@@ -1080,10 +1117,13 @@ body[data-window="pet"] .pet-window {
 
 .task-item:hover .co-do-button,
 .task-item:hover .move-button,
+.task-item:hover .delete-button,
 .task-item:focus-within .co-do-button,
 .task-item:focus-within .move-button,
+.task-item:focus-within .delete-button,
 .task-item.is-co-doing .co-do-button,
-.task-item.is-done .move-button {
+.task-item.is-done .move-button,
+.task-item.is-done .delete-button {
   opacity: 1;
   transform: translateX(0);
 }
@@ -1106,6 +1146,7 @@ body[data-window="pet"] .pet-window {
 
 .check-button,
 .move-button,
+.delete-button,
 .icon-action {
   width: 26px;
   height: 26px;
@@ -1143,8 +1184,21 @@ body[data-window="pet"] .pet-window {
 }
 
 .move-button,
+.delete-button,
 .icon-action {
   color: var(--clay);
+}
+
+.delete-button {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.delete-button:hover,
+.delete-button:focus-visible {
+  border-color: color-mix(in srgb, var(--clay) 28%, transparent);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
 }
 
 .task-title-wrap,
@@ -1161,11 +1215,46 @@ body[data-window="pet"] .pet-window {
   gap: 1px;
 }
 
+.task-title-edit-trigger {
+  display: block;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.task-title-edit-trigger:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid var(--theme-focus);
+  outline-offset: 2px;
+}
+
 .task-title {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.task-title-edit-form {
+  min-width: 0;
+  margin: 0;
+}
+
+.task-title-edit-input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  border: 1px solid var(--theme-focus);
+  border-radius: 10px;
+  padding: 0 8px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  font-size: 13px;
+  outline: none;
+  box-shadow: 0 0 0 3px var(--theme-body-spill-soft);
 }
 
 .co-do-chip {

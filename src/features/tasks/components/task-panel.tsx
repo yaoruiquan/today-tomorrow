@@ -164,6 +164,8 @@ export function TaskPanel({ model, compact = false }: TaskPanelProps) {
           onEmptySubmit={handleEmptyColumnAdd}
           onToggle={model.toggleTask}
           onMove={(id: string, bucket: TaskBucket) => model.moveTaskToBucket(id, bucket)}
+          onRename={model.renameTaskById}
+          onDelete={model.abandonTaskById}
           onStartCoDo={model.startCoDoTask}
           onStopCoDo={model.stopCoDoTask}
         />
@@ -180,6 +182,8 @@ export function TaskPanel({ model, compact = false }: TaskPanelProps) {
           onEmptySubmit={handleEmptyColumnAdd}
           onToggle={model.toggleTask}
           onMove={(id: string, bucket: TaskBucket) => model.moveTaskToBucket(id, bucket)}
+          onRename={model.renameTaskById}
+          onDelete={model.abandonTaskById}
           onStartCoDo={model.startCoDoTask}
           onStopCoDo={model.stopCoDoTask}
         />

@@ -7,6 +7,7 @@ import {
 import { useAppModel } from "../app-model";
 import { GlowPet } from "../../features/pet/components/glow-pet";
 import { PetMessage } from "../../features/pet/components/pet-message";
+import type { GrowthEvent } from "../../features/growth/growth-types";
 import { TaskPanel } from "../../features/tasks/components/task-panel";
 import {
   isTauriRuntime,
@@ -14,7 +15,7 @@ import {
   readCurrentPetWindowPosition,
   readCurrentPetWindowScaleFactor,
   setCurrentPetWindowPosition,
-  showPanelNearPet,
+  togglePanelNearPet,
   trackPetWindowPosition
 } from "../../features/desktop-shell/window-events";
 import type { DesktopPosition } from "../../features/desktop-shell/desktop-window-types";
@@ -221,14 +222,18 @@ export function PetView() {
   }
 
   async function openPetPanel() {
-    const openedNativePanel = await showPanelNearPet();
+    const openedNativePanel = await togglePanelNearPet();
 
-    if (openedNativePanel) {
-      model.showMessage("我回来了。");
+    if (openedNativePanel !== null) {
+      if (openedNativePanel) model.showMessage("我回来了。");
       return;
     }
 
     model.togglePanel();
+
+    if (!model.data.panel.open) {
+      model.showMessage("我回来了。");
+    }
   }
 
   function suppressPetClickFor(durationMs: number) {
@@ -281,9 +286,10 @@ export function PetView() {
     >
       <div className="pet-stage">
         <GlowPet
+          key={model.data.pet.lastGrowthEvent?.id ?? "pet"}
           mood={model.displayMood}
           growthStage={model.data.growth.stage}
-          reaction={petReactionFromMessage(model.data.pet.lastMessage, Boolean(model.activeCoDoTask))}
+          reaction={petReactionFromGrowthEvent(model.data.pet.lastGrowthEvent, Boolean(model.activeCoDoTask))}
           hoverEnabled={model.data.settings.hoverInteractionEnabled}
           quietModeActive={model.quietModeActive}
           gentleReminderActive={model.gentleReminderActive}
@@ -311,12 +317,22 @@ function positionKey(position: { x: number; y: number }): string {
   return `${Math.round(position.x)}:${Math.round(position.y)}`;
 }
 
-function petReactionFromMessage(message: string | undefined, coDoActive: boolean) {
+function petReactionFromGrowthEvent(event: GrowthEvent | undefined, coDoActive: boolean) {
   if (coDoActive) return "coDo";
-  if (!message) return undefined;
-  if (message.includes("接住") || message.includes("明天已经")) return "catch";
-  if (message.includes("完成")) return "complete";
-  if (message.includes("放进") || message.includes("明天会")) return "record";
-  if (message.includes("收起来") || message.includes("收好")) return "review";
-  return undefined;
+
+  switch (event?.type) {
+    case "recordToday":
+    case "recordTomorrow":
+      return "record";
+    case "completeTask":
+      return "complete";
+    case "catchTomorrow":
+      return "catch";
+    case "eveningReview":
+      return "review";
+    case "coDo":
+      return "coDo";
+    default:
+      return undefined;
+  }
 }

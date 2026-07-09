@@ -8,7 +8,7 @@ import {
 } from "../features/evening-review/evening-review-flow";
 import { eveningReviewCopy } from "../features/evening-review/evening-review-copy";
 import { getGrowthStageFromState } from "../features/growth/growth-rules";
-import type { GrowthState } from "../features/growth/growth-types";
+import type { GrowthEvent, GrowthEventType, GrowthState } from "../features/growth/growth-types";
 import { getBasePetMood, type PetMood } from "../features/pet/pet-mood";
 import { isEveningByTime, isQuietModeActive, quietModeUntil } from "../features/settings/settings-store";
 import type {
@@ -17,7 +17,7 @@ import type {
   PetThemeId,
   QuietModeId
 } from "../features/settings/settings-types";
-import { abandonTask, addTask, moveTask, toggleTaskDone } from "../features/tasks/task-reducer";
+import { abandonTask, addTask, moveTask, renameTask, toggleTaskDone } from "../features/tasks/task-reducer";
 import { openTaskCount, tasksInBucket } from "../features/tasks/task-selectors";
 import type { Task, TaskBucket } from "../features/tasks/task-types";
 import { createId } from "../shared/lib/ids";
@@ -34,6 +34,8 @@ import type { AppData, PanelMode, PetPosition } from "./app-types";
 interface CompleteEveningReviewInput {
   localDate: string;
   message: string;
+  growthEventType?: GrowthEventType;
+  previousGrowth?: GrowthState;
 }
 
 interface AppModel {
@@ -52,6 +54,7 @@ interface AppModel {
   addTaskToBucket: (title: string, bucket: TaskBucket) => void;
   toggleTask: (id: string) => void;
   moveTaskToBucket: (id: string, bucket: TaskBucket) => void;
+  renameTaskById: (id: string, title: string) => void;
   abandonTaskById: (id: string) => void;
   startEveningReview: () => void;
   closeEveningReview: () => void;
@@ -107,6 +110,11 @@ export function completeEveningReviewState(
       ? current.growth.eveningReviewStreak
       : current.growth.eveningReviewStreak + 1
   });
+  const growthEvent = createGrowthEvent(
+    input.previousGrowth ?? current.growth,
+    nextGrowth,
+    input.growthEventType ?? "eveningReview"
+  );
 
   return {
     ...current,
@@ -122,7 +130,8 @@ export function completeEveningReviewState(
     pet: {
       ...current.pet,
       mood: "happy",
-      lastMessage: input.message
+      lastGrowthEvent: growthEvent,
+      lastMessage: growthMessageForStage(growthEvent, input.message)
     }
   };
 }
@@ -132,6 +141,38 @@ export function withGrowthStage(growth: GrowthState): GrowthState {
     ...growth,
     stage: getGrowthStageFromState(growth)
   };
+}
+
+function createGrowthEvent(
+  previousGrowth: GrowthState,
+  nextGrowth: GrowthState,
+  type: GrowthEventType
+): GrowthEvent {
+  return {
+    id: createId("growth"),
+    type,
+    at: new Date().toISOString(),
+    stageBefore: previousGrowth.stage,
+    stageAfter: nextGrowth.stage,
+    stageChanged: previousGrowth.stage !== nextGrowth.stage
+  };
+}
+
+function growthMessageForStage(event: GrowthEvent, fallback: string): string {
+  if (!event.stageChanged) return fallback;
+
+  switch (event.stageAfter) {
+    case "smallGlow":
+      return "小光团好像长大了一点。";
+    case "starCore":
+      return "身体里多了一点星尘光。";
+    case "holdingGlow":
+      return "它更会接住明天了。";
+    case "dayNightCore":
+      return "它把这些天的光都记住了。";
+    default:
+      return fallback;
+  }
 }
 
 export function getGentleReminderCandidate(
@@ -388,6 +429,7 @@ export function useAppModel(): AppModel {
       pet: {
         ...current.pet,
         mood: mood ?? current.pet.mood,
+        lastGrowthEvent: undefined,
         lastMessage: message
       }
     }));
@@ -405,23 +447,34 @@ export function useAppModel(): AppModel {
     }
 
     const nowIso = new Date().toISOString();
-    update((current) => ({
-      ...current,
-      tasks: addTask(current.tasks, {
-        id: createId("task"),
-        title: trimmed,
-        bucket,
-        now: nowIso
-      }),
-      growth: withGrowthStage({
+    update((current) => {
+      const nextGrowth = withGrowthStage({
         ...current.growth,
         recordedTaskCount: current.growth.recordedTaskCount + 1
-      }),
-      pet: {
-        ...current.pet,
-        lastMessage: bucket === "today" ? "放进今天了。" : "明天会接住它。"
-      }
-    }));
+      });
+      const growthEvent = createGrowthEvent(
+        current.growth,
+        nextGrowth,
+        bucket === "today" ? "recordToday" : "recordTomorrow"
+      );
+      const message = bucket === "today" ? "放进今天了。" : "明天会接住它。";
+
+      return {
+        ...current,
+        tasks: addTask(current.tasks, {
+          id: createId("task"),
+          title: trimmed,
+          bucket,
+          now: nowIso
+        }),
+        growth: nextGrowth,
+        pet: {
+          ...current.pet,
+          lastGrowthEvent: growthEvent,
+          lastMessage: growthMessageForStage(growthEvent, message)
+        }
+      };
+    });
   }
 
   function toggleTask(id: string): void {
@@ -436,6 +489,9 @@ export function useAppModel(): AppModel {
             completedTaskCount: current.growth.completedTaskCount + 1
           })
         : current.growth;
+      const growthEvent = willComplete
+        ? createGrowthEvent(current.growth, nextGrowth, "completeTask")
+        : undefined;
       const taskBeingToggled = current.tasks.find((item) => item.id === id);
       const shouldStopCoDo =
         willComplete &&
@@ -451,10 +507,16 @@ export function useAppModel(): AppModel {
           activeCoDoTaskId: shouldStopCoDo ? undefined : current.pet.activeCoDoTaskId,
           coDoStartedAt: shouldStopCoDo ? undefined : current.pet.coDoStartedAt,
           mood: willComplete ? "happy" : current.pet.mood,
+          lastGrowthEvent: growthEvent,
           lastMessage: willComplete
-            ? shouldStopCoDo
-              ? "这件事已经被轻轻完成。"
-              : "完成得很安静。"
+            ? growthEvent
+              ? growthMessageForStage(
+                  growthEvent,
+                  shouldStopCoDo ? "这件事已经被轻轻完成。" : "完成得很安静。"
+                )
+              : shouldStopCoDo
+                ? "这件事已经被轻轻完成。"
+                : "完成得很安静。"
             : "重新放回视线里。"
         }
       };
@@ -477,12 +539,29 @@ export function useAppModel(): AppModel {
           ...current.pet,
           activeCoDoTaskId: current.pet.activeCoDoTaskId === id ? undefined : current.pet.activeCoDoTaskId,
           coDoStartedAt: current.pet.activeCoDoTaskId === id ? undefined : current.pet.coDoStartedAt,
+          lastGrowthEvent: undefined,
           lastMessage: bucket === "tomorrow" ? "交给明天。" : "今天继续。"
         }
       };
 
       return maybeCompleteReviewIfCleared(next);
     });
+  }
+
+  function renameTaskById(id: string, title: string): void {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+
+    const nowIso = new Date().toISOString();
+    update((current) => ({
+      ...current,
+      tasks: renameTask(current.tasks, id, trimmed, nowIso),
+      pet: {
+        ...current.pet,
+        lastGrowthEvent: undefined,
+        lastMessage: "这件事改好了。"
+      }
+    }));
   }
 
   function abandonTaskById(id: string): void {
@@ -495,6 +574,7 @@ export function useAppModel(): AppModel {
           ...current.pet,
           activeCoDoTaskId: current.pet.activeCoDoTaskId === id ? undefined : current.pet.activeCoDoTaskId,
           coDoStartedAt: current.pet.activeCoDoTaskId === id ? undefined : current.pet.coDoStartedAt,
+          lastGrowthEvent: undefined,
           lastMessage: "这件事已经放下。"
         }
       };
@@ -519,6 +599,7 @@ export function useAppModel(): AppModel {
       pet: {
         ...current.pet,
         panelOpen: open,
+        lastGrowthEvent: undefined,
         lastMessage: open ? "我回来了。" : "我在角落。"
       },
       panel: {
@@ -549,6 +630,7 @@ export function useAppModel(): AppModel {
         ...current.pet,
         panelOpen: true,
         mood: "evening",
+        lastGrowthEvent: undefined,
         lastMessage: "今天还有一点点。"
       }
     }));
@@ -563,6 +645,7 @@ export function useAppModel(): AppModel {
       },
       pet: {
         ...current.pet,
+        lastGrowthEvent: undefined,
         lastMessage: eveningReviewCopy.quiet
       }
     }));
@@ -600,7 +683,9 @@ export function useAppModel(): AppModel {
         },
         {
           localDate,
-          message: "我接住了，明天还在。"
+          message: "我接住了，明天还在。",
+          growthEventType: "catchTomorrow",
+          previousGrowth: current.growth
         }
       );
     });
@@ -646,6 +731,7 @@ export function useAppModel(): AppModel {
       },
       pet: {
         ...current.pet,
+        lastGrowthEvent: undefined,
         lastMessage: enabled ? "我可以接住明天。" : "今天先留在这里。"
       }
     }));
@@ -660,6 +746,7 @@ export function useAppModel(): AppModel {
       },
       pet: {
         ...current.pet,
+        lastGrowthEvent: undefined,
         lastMessage: enabled ? "我会轻轻提醒。" : "我会更安静。"
       }
     }));
@@ -687,6 +774,7 @@ export function useAppModel(): AppModel {
       },
       pet: {
         ...current.pet,
+        lastGrowthEvent: undefined,
         lastMessage: mode === "off" ? "我又轻轻亮起来了。" : "我会安静陪着。"
       }
     }));
@@ -708,20 +796,26 @@ export function useAppModel(): AppModel {
       const task = current.tasks.find((item) => item.id === id);
       if (!task || task.status !== "open") return current;
 
+      const nextGrowth = withGrowthStage({
+        ...current.growth,
+        coDoSessionCount:
+          current.pet.activeCoDoTaskId === id
+            ? current.growth.coDoSessionCount
+            : current.growth.coDoSessionCount + 1
+      });
+      const growthEvent =
+        current.pet.activeCoDoTaskId === id ? undefined : createGrowthEvent(current.growth, nextGrowth, "coDo");
+      const message = "我陪你做这件。";
+
       return {
         ...current,
-        growth: withGrowthStage({
-          ...current.growth,
-          coDoSessionCount:
-            current.pet.activeCoDoTaskId === id
-              ? current.growth.coDoSessionCount
-              : current.growth.coDoSessionCount + 1
-        }),
+        growth: nextGrowth,
         pet: {
           ...current.pet,
           activeCoDoTaskId: id,
           coDoStartedAt: nowIso,
-          lastMessage: "我陪你做这件。"
+          lastGrowthEvent: growthEvent,
+          lastMessage: growthEvent ? growthMessageForStage(growthEvent, message) : message
         }
       };
     });
@@ -734,6 +828,7 @@ export function useAppModel(): AppModel {
         ...current.pet,
         activeCoDoTaskId: undefined,
         coDoStartedAt: undefined,
+        lastGrowthEvent: undefined,
         lastMessage: "先停在这里也可以。"
       }
     }));
@@ -765,6 +860,7 @@ export function useAppModel(): AppModel {
     addTaskToBucket,
     toggleTask,
     moveTaskToBucket,
+    renameTaskById,
     abandonTaskById,
     startEveningReview,
     closeEveningReview,

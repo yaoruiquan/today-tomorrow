@@ -1240,3 +1240,83 @@ Requests for CEO:
 - None for T-012 implementation. CEO decision remains needed only for final product acceptance or release-scope expansion such as full Xcode, Developer ID signing, notarization, DMG packaging, or launch-at-login integration.
 Risks:
 - Native panel focus/blur behavior is unchanged structurally and the new local inputs remain inside the protected panel root, but QA should still verify real native click/type interactions because macOS automation can be selective about synthetic keyboard delivery.
+
+## 2026-07-08 16:31 CST - Product Developer Sends T-013 To QA
+
+DEV UPDATE
+Role: Product Developer
+Thread ID: `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Task ID: T-013
+Status: ready-for-qa
+Summary:
+Documented and implemented the growth-causality pass requested by the user. The pet now receives explicit transient growth events from user actions instead of inferring reactions from message text; stage changes can show short milestone copy; relaunch normalization clears transient growth events; and tests cover persistence, event creation, and event-driven reactions.
+Files changed:
+- `docs/design/t-013-growth-causality-and-milestones.md`
+- `docs/product-spec.md`
+- `docs/qa-checklist.md`
+- `docs/agents/board.md`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+- `src/features/growth/growth-types.ts`
+- `src/app/app-types.ts`
+- `src/app/app-storage.ts`
+- `src/app/app-model.ts`
+- `src/app/views/pet-view.tsx`
+- `src/app/app-model.test.ts`
+Designer / product intent:
+- Keep the visual growth direction from T-010: the pet body itself evolves and emits light from within, rather than using a large separate glow ring.
+- Make the growth loop legible: recording, completing, `接住明天`, review, and co-do should each create an observable pet response.
+- Avoid XP, score, streak punishment, shame copy, projects, tags, or task-management dashboard behavior.
+QA interaction:
+- New `DEVELOPMENT -> QA` handoff appended in `docs/agents/handoffs.md`.
+Verification:
+- `pnpm typecheck` passed.
+- `pnpm test -- src/app/app-model.test.ts src/features/growth/growth-rules.test.ts src/features/pet/components/glow-pet.test.tsx` passed.
+- `pnpm check` passed: lint, typecheck, and Vitest all green; 10 test files / 39 tests.
+- `pnpm build` passed.
+- `git diff --check` passed for the T-013 changed files.
+Requests for CEO:
+- None. This implements the user's accepted growth-system direction inside existing product scope.
+Risks:
+- This pass strengthens growth causality and milestone feedback, but does not redesign the full future multi-channel body-growth system. QA should still visually verify that the existing T-010 body stages plus T-013 event reactions read as growth from the pet body itself, not as a separate decorative halo.
+
+## 2026-07-09 18:31 CST - Product Developer Updates T-012 From User Bug Reports
+
+DEV UPDATE
+Role: Product Developer
+Thread ID: `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Task ID: T-012
+Status: ready-for-qa
+Summary:
+Addressed the user's post-T-012 task-list feedback: task titles can be edited from the row, tasks can be deleted from the panel, and long Today/Tomorrow lists now render all non-abandoned tasks inside a scrollable column list instead of replacing tasks after four rows with compact overflow copy.
+Files changed:
+- `src/features/tasks/components/task-column.tsx`
+- `src/features/tasks/components/task-item.tsx`
+- `src/features/tasks/components/task-panel.test.tsx`
+- `src/features/tasks/task-reducer.ts`
+- `src/features/tasks/task-reducer.test.ts`
+- `src/app/app-model.ts`
+- `src/shared/styles/base.css`
+- `docs/agents/board.md`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+Designer interaction:
+- No new design decision needed. This follows direct user feedback that hidden overflow was preventing the task list from scrolling.
+QA interaction:
+- New `DEVELOPMENT -> QA` handoff appended in `docs/agents/handoffs.md`.
+Verification:
+- `pnpm exec vitest run src/features/tasks/components/task-panel.test.tsx` passed: 6 tests.
+- `pnpm check` passed: lint, typecheck, and Vitest all green; 10 test files / 45 tests.
+- `pnpm build` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" cargo fmt --manifest-path src-tauri/Cargo.toml --check` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" cargo check --manifest-path src-tauri/Cargo.toml` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" pnpm tauri build --bundles dmg` passed and generated `src-tauri/target/release/bundle/dmg/今天明天_0.1.0_aarch64.dmg`.
+- `hdiutil verify src-tauri/target/release/bundle/dmg/今天明天_0.1.0_aarch64.dmg` passed.
+- DMG-mounted `今天明天.app` passed `codesign --verify --deep --strict --verbose=2`.
+- Installed the DMG-mounted app to `/Applications/今天明天.app` and launched it.
+- Browser scroll smoke `output/playwright/task-list-scroll-fix-result.json` passed: 12 tasks rendered, 0 overflow rows, `scrollHeight 526 > clientHeight 204`, and `scrollTop` moved from 0 to 322 with 0 console/page errors.
+- `git diff --check` passed.
+Requests for CEO:
+- None for this fix. CEO decision is only needed for final release acceptance or notarization/Developer ID requirements.
+Risks:
+- The current DMG is ad-hoc signed and not notarized because Apple Developer credentials are not configured locally.

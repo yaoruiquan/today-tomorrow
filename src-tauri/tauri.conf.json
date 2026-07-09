@@ -45,7 +45,8 @@
         },
         "alwaysOnTop": false,
         "visible": false,
-        "transparent": false,
+        "transparent": true,
+        "shadow": false,
         "skipTaskbar": false,
         "acceptFirstMouse": true
       }

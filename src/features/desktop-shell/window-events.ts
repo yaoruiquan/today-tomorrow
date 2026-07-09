@@ -18,6 +18,11 @@ export async function showPanelNearPet(): Promise<boolean> {
   return true;
 }
 
+export async function togglePanelNearPet(): Promise<boolean | null> {
+  if (!isTauriRuntime()) return null;
+  return invoke<boolean>("toggle_panel_near_pet");
+}
+
 export async function trackPetWindowPosition(): Promise<boolean> {
   if (!isTauriRuntime()) return false;
   await invoke("track_pet_window_position");

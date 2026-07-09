@@ -1,5 +1,5 @@
 import type { DayCycleState } from "../features/day-cycle/day-cycle-types";
-import type { GrowthState } from "../features/growth/growth-types";
+import type { GrowthEvent, GrowthState } from "../features/growth/growth-types";
 import type { PetMood } from "../features/pet/pet-mood";
 import type { Settings } from "../features/settings/settings-types";
 import type { Task } from "../features/tasks/task-types";
@@ -19,6 +19,7 @@ export interface PetState {
   coDoStartedAt?: string;
   lastGentleReminderAt?: string;
   lastGentleReminderMessage?: string;
+  lastGrowthEvent?: GrowthEvent;
 }
 
 export type PanelMode = "tasks" | "eveningReview";
