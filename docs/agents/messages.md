@@ -1362,3 +1362,40 @@ Requests for CEO:
 - None for this fix. CEO decision is only needed for full database/cloud sync scope or notarized distribution.
 Risks:
 - This remains local persistence, not an external database or cloud sync. The current DMG is ad-hoc signed and not notarized.
+
+## 2026-07-10 15:04 CST - Product Developer Sends T-015 To QA
+
+DEV UPDATE
+Role: Product Developer
+Thread ID: `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Task ID: T-015
+Status: ready-for-qa
+Summary:
+Addressed the user's concern that the project had no database for record storage. Desktop persistence now uses a local SQLite database `today-tomorrow.sqlite` in the Tauri app data directory, with `app_state` for full app state and `task_records` for queryable task history. Legacy `app-data.json` is migrated into SQLite when SQLite is empty.
+Files changed:
+- `src-tauri/Cargo.toml`
+- `src-tauri/Cargo.lock`
+- `src-tauri/src/persistence.rs`
+- `package.json`
+- `src-tauri/tauri.conf.json`
+- `docs/product-spec.md`
+- `docs/development-guide.md`
+- `docs/architecture.md`
+- `docs/qa-checklist.md`
+- `docs/agents/board.md`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+Verification:
+- `pnpm check` passed: 10 test files / 51 tests.
+- `cargo fmt --manifest-path src-tauri/Cargo.toml --check` passed.
+- `cargo check --manifest-path src-tauri/Cargo.toml` passed.
+- `pnpm tauri build --bundles dmg` passed for `0.1.3`.
+- `hdiutil verify src-tauri/target/release/bundle/dmg/今天明天_0.1.3_aarch64.dmg` passed.
+- DMG-mounted app passed `codesign --verify --deep --strict --verbose=2`.
+- Installed `/Applications/今天明天.app` from the `0.1.3` DMG.
+- Confirmed `/Users/yao/Library/Application Support/com.todaytomorrow.desktop/today-tomorrow.sqlite` exists.
+- Confirmed SQLite tables `app_state` and `task_records`, current app state row, and task records grouped by status via `sqlite3`.
+Requests for CEO:
+- None for local database persistence. CEO decision is only needed if product direction expands to cloud sync, accounts, or multi-device storage.
+Risks:
+- SQLite is local-only. Current DMG remains ad-hoc signed and not notarized.

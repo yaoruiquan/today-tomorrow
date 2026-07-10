@@ -707,15 +707,20 @@ return "calm";
 
 ### 8.1 MVP
 
-Web 预览保留 `localStorage` 作为浏览器预览和原生读写失败时的兜底。当前 Tauri 版本已经使用应用数据目录下的 JSON 文件作为原生持久化主路径，并通过 Rust command 读写。
+Web 预览保留 `localStorage` 作为浏览器预览和原生读写失败时的兜底。当前 Tauri 桌面版使用应用数据目录下的 SQLite 数据库作为原生持久化主路径，并通过 Rust command 读写。旧版 `app-data.json` 会在首次加载时自动迁移进 SQLite。
 
-文件建议：
+数据库位置：
 
 ```text
-~/Library/Application Support/com.todaytomorrow.desktop/app-data.json
+~/Library/Application Support/com.todaytomorrow.desktop/today-tomorrow.sqlite
 ```
 
 实际路径由 Tauri / Rust 层根据系统 app data 目录获取，不要在前端硬编码。
+
+当前数据库表：
+
+- `app_state`：保存完整当前应用状态 JSON，保持前端状态模型兼容。
+- `task_records`：同步任务记录字段，便于删除、归档、历史记录和后续查询能力扩展。
 
 ### 8.2 数据迁移
 
@@ -986,7 +991,7 @@ MVP 完成时必须满足：
 - 正式应用已迁移到 Vite + React + TypeScript。
 - Tauri 已配置 `pet` / `panel` 双窗口模型。
 - 今天 / 明天任务、下班整理、日夜 rollover、宠物 mood、轻成长、T-006 视觉系统、T-007 能力、T-008 丝滑交互、T-009 `接住明天` 品牌动作、T-010 可见成长形态已经实现。
-- 原生持久化已迁移到 Tauri app data JSON，并保留 Web `localStorage` fallback。
+- 原生持久化已迁移到 Tauri app data SQLite，并保留 Web `localStorage` fallback。
 - 系统托盘 / 应用菜单已提供打开面板、归位小光团和退出入口。
 - Web 预览和原生 `.app` 均已有自动化 / QA 记录，截图与 smoke 结果保存在 `output/playwright/`。
 - 当前可验收产物为 `/Users/yao/Documents/今天明天/src-tauri/target/release/bundle/macos/今天明天.app`。

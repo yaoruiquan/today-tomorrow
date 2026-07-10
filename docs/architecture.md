@@ -32,7 +32,7 @@ Web 预览使用 URL 区分窗口：
 
 `useAppModel` 是当前 MVP 的应用状态入口，负责组合任务、日夜循环、下班整理、宠物状态和轻成长数据。
 
-当前 MVP 使用 `localStorage` 持久化：
+Web 预览使用 `localStorage` 持久化，桌面版使用 Tauri app data 目录下的 SQLite 数据库 `today-tomorrow.sqlite` 持久化：
 
 - 任务列表。
 - 日期 rollover 状态。
@@ -43,7 +43,7 @@ Web 预览使用 URL 区分窗口：
 
 加载时会把运行时面板状态重置为关闭，避免应用重启后直接弹出任务面板。
 
-正式安装包后续可以把持久化迁移到 Tauri app data JSON 文件，但业务规则仍应保留在 TypeScript 纯函数中。
+SQLite 由 `src-tauri/src/persistence.rs` 管理，包含 `app_state` 和 `task_records` 两张表。`app_state` 保存完整 AppData JSON，保持前端状态模型简单；`task_records` 同步任务字段，支撑删除、归档和历史记录查询。旧版 `app-data.json` 会在首次加载时迁移进 SQLite。业务规则仍保留在 TypeScript 纯函数中。
 
 ## 4. 业务模块
 
@@ -75,4 +75,3 @@ Web 预览使用 URL 区分窗口：
 当前未验证：
 
 - Rust/Tauri 编译和桌面运行。当前本机缺少 `rustc`、`cargo`、`rustup`，且未安装完整 Xcode。
-

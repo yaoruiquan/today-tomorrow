@@ -1978,9 +1978,69 @@ Acceptance criteria to verify:
 - A previous-day Today task is not shown in the current Today list after launch/day prep.
 - A previous-day Today task is kept in local history as `已归档`.
 - A previous-day Tomorrow open task appears in the current Today list.
-- The product continues using local Tauri JSON persistence / Web localStorage fallback, without introducing cloud sync or a heavy database UI.
+- The product uses local Tauri SQLite persistence / Web localStorage fallback, without introducing cloud sync or a heavy database UI.
 
 Known risks:
-- This is local history, not cloud database/sync. The generated DMG and installed app are ad-hoc signed and not notarized.
+- This is local SQLite history, not cloud database/sync. The generated DMG and installed app are ad-hoc signed and not notarized.
+
+Please verify and return `QA RESULT`.
+
+## 2026-07-10 15:04 CST - Product Developer -> QA Verifier
+
+DEVELOPMENT -> QA
+Product: 今天明天
+Task ID: T-015
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+Subject: Ready for verification - SQLite local database persistence
+
+Implemented:
+- Added `rusqlite` with bundled SQLite to the Tauri desktop app.
+- Replaced desktop primary persistence from direct `app-data.json` reads/writes to SQLite database `today-tomorrow.sqlite`.
+- Added `app_state` table for full current AppData JSON so the existing front-end state model remains compatible.
+- Added `task_records` table for normalized task record storage: id, title, bucket, status, timestamps, archive/delete metadata, and carried-from date.
+- Added database initialization, indexes, app-state upsert, task record synchronization, and clear behavior.
+- Added migration path: if SQLite has no app state but legacy `app-data.json` exists, load the JSON once and save it into SQLite.
+- Kept Web preview `localStorage` fallback unchanged.
+- Updated product spec, architecture, development guide, QA checklist, agent board/messages/handoff notes, and release version to `0.1.3`.
+
+Changed files:
+- `src-tauri/Cargo.toml`
+- `src-tauri/Cargo.lock`
+- `src-tauri/src/persistence.rs`
+- `package.json`
+- `src-tauri/tauri.conf.json`
+- `docs/product-spec.md`
+- `docs/development-guide.md`
+- `docs/architecture.md`
+- `docs/qa-checklist.md`
+- `docs/agents/board.md`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+
+Verification already run:
+- `pnpm check` passed: lint, typecheck, and Vitest all green; 10 test files / 51 tests.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" cargo fmt --manifest-path src-tauri/Cargo.toml --check` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" cargo check --manifest-path src-tauri/Cargo.toml` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" pnpm tauri build --bundles dmg` passed for `0.1.3`.
+- `hdiutil verify src-tauri/target/release/bundle/dmg/今天明天_0.1.3_aarch64.dmg` passed.
+- DMG-mounted app passed `codesign --verify --deep --strict --verbose=2`.
+- Installed the DMG-mounted app to `/Applications/今天明天.app` and launched it.
+- Confirmed database exists at `/Users/yao/Library/Application Support/com.todaytomorrow.desktop/today-tomorrow.sqlite`.
+- `sqlite3 ... ".tables"` returned `app_state` and `task_records`.
+- `sqlite3 ... "SELECT key, length(value), updated_at FROM app_state;"` returned current app state.
+- `sqlite3 ... "SELECT status, count(*) FROM task_records GROUP BY status ORDER BY status;"` returned persisted task records by status.
+
+Acceptance criteria to verify:
+- Desktop app creates `today-tomorrow.sqlite` under the Tauri app data directory.
+- Database contains `app_state` and `task_records` tables.
+- Current app state persists across relaunch from SQLite.
+- Task records are queryable from `task_records`, including deleted/archived statuses.
+- Legacy `app-data.json` can still be migrated if SQLite is empty.
+- Web preview continues using localStorage fallback.
+
+Known risks:
+- This is a local SQLite database, not cloud sync or multi-device storage.
+- The generated DMG and installed app are ad-hoc signed and not notarized.
 
 Please verify and return `QA RESULT`.

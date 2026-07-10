@@ -365,6 +365,8 @@ pnpm tauri:build
 - 删除任务后，任务从当前今天/明天列消失。
 - 删除任务作为 `abandoned` 保留在本机数据中。
 - 设置弹层 `记录` 区显示最近删除/归档记录，并展示状态文案，例如 `已删除` / `已归档` / `已完成`。
+- 桌面版应在 `~/Library/Application Support/com.todaytomorrow.desktop/today-tomorrow.sqlite` 建立 SQLite 数据库。
+- SQLite 数据库应包含 `app_state` 和 `task_records` 表，且任务删除/归档后 `task_records` 可查到相应状态。
 - 历史记录入口保持轻量，不引入完整数据库管理页面、搜索、标签、项目或复杂表格。
 
 ### 14.3 跨天清理
@@ -388,5 +390,5 @@ pnpm tauri:build
 
 - 当前机器已安装 Rust/Cargo/rustup，并已完成 `pnpm tauri:build`。完整 Xcode 仍缺失，因此未验证 Apple notarization 或正式分发签名。
 - macOS DMG target 暂未作为默认产物。当前可验收产物为 `src-tauri/target/release/bundle/macos/今天明天.app`。
-- 原生 `.app` 已使用 Tauri app data JSON 持久化，并保留 WebView localStorage 作为 Web 预览和原生读写失败时的 fallback。
+- 原生 `.app` 已使用 Tauri app data SQLite 持久化，并保留 WebView localStorage 作为 Web 预览和原生读写失败时的 fallback。
 - `pet` 窗口已启用透明无边框桌宠模式；QA 需继续留意透明窗口在不同 macOS / 多屏环境下的点击、拖拽和视觉合成表现。
