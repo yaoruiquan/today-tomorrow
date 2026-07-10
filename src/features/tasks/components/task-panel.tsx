@@ -5,7 +5,7 @@ import { placePetWindow, recenterPetWindow } from "../../desktop-shell/window-ev
 import { EveningReviewDialog } from "../../evening-review/components/evening-review-dialog";
 import { glowIntensityOptions, petThemeOptions } from "../../settings/theme-options";
 import type { DesktopPlacementId, QuietModeId } from "../../settings/settings-types";
-import type { TaskBucket } from "../task-types";
+import type { Task, TaskBucket } from "../task-types";
 import { TaskColumn } from "./task-column";
 
 interface TaskPanelProps {
@@ -31,6 +31,7 @@ export function TaskPanel({ model, compact = false }: TaskPanelProps) {
   const reviewAction = model.isEvening && model.todayOpenCount > 0 ? "把今天收起来" : "下班整理";
   const taskPanelClassName = `task-panel${compact ? " is-compact" : ""}`;
   const activeCoDoTitle = model.activeCoDoTask?.title;
+  const historyPreviewTasks = model.historyTasks.slice(0, 6);
   const quietModeValue = model.quietModeActive ? model.data.settings.quietMode.mode : "off";
   const catchSuggestionVisible =
     model.data.settings.catchTomorrowEnabled &&
@@ -351,6 +352,24 @@ export function TaskPanel({ model, compact = false }: TaskPanelProps) {
                   </button>
                 </div>
               </section>
+
+              <section>
+                <h2>记录</h2>
+                <p className="history-note">{`本机保存 ${model.historyTasks.length} 条旧记录`}</p>
+                {historyPreviewTasks.length ? (
+                  <ul className="history-list" aria-label="最近任务记录">
+                    {historyPreviewTasks.map((task) => (
+                      <li key={task.id}>
+                        <span>{historyDateLabel(task)}</span>
+                        <strong>{historyStatusLabel(task)}</strong>
+                        <p>{task.title}</p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="history-empty">还没有旧记录。</p>
+                )}
+              </section>
             </div>
           ) : null}
         </div>
@@ -381,6 +400,22 @@ function getCompanionMessage(input: {
     default:
       return "小光团在这里，先放下一件小事。";
   }
+}
+
+function historyDateLabel(task: Task): string {
+  if (task.archivedFromDate) return task.archivedFromDate;
+
+  const date = new Date(task.abandonedAt ?? task.archivedAt ?? task.completedAt ?? task.updatedAt ?? task.createdAt);
+
+  if (Number.isNaN(date.getTime())) return "旧记录";
+
+  return toLocalDateKey(date);
+}
+
+function historyStatusLabel(task: Task): string {
+  if (task.status === "abandoned") return "已删除";
+  if (task.completedAt) return "已完成";
+  return "已归档";
 }
 
 function getTodayStatus(openTodayCount: number): string {

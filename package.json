@@ -1,7 +1,7 @@
 {
   "name": "today-tomorrow",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A gentle Mac desktop pet for today/tomorrow task notes and evening review.",
   "type": "module",
   "repository": {

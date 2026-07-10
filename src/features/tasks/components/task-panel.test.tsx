@@ -86,6 +86,18 @@ describe("TaskPanel column-local add", () => {
     expect(within(todayColumn).queryByText(/先放在后面/)).not.toBeInTheDocument();
   });
 
+  it("keeps long task text visible in the task row", async () => {
+    render(<Harness />);
+
+    const longTitle =
+      "这是一条比较长的记录内容，用来确认任务行会完整换行展示，而不是只露出前面一点点文字。";
+    const todayInput = screen.getByLabelText("添加今天的任务") as HTMLInputElement;
+    fireEvent.change(todayInput, { target: { value: longTitle } });
+    fireEvent.click(screen.getByRole("button", { name: "添加到今天" }));
+
+    expect(await screen.findByText(longTitle)).toBeInTheDocument();
+  });
+
   it("shows bucket-specific gentle feedback on empty submit", async () => {
     render(<Harness />);
 
@@ -118,6 +130,22 @@ describe("TaskPanel column-local add", () => {
       status: "abandoned"
     });
     expect(readModel().data.pet.lastMessage).toBe("这件事已经放下。");
+  });
+
+  it("shows deleted tasks in the local history record", async () => {
+    render(<Harness />);
+
+    const todayInput = screen.getByLabelText("添加今天的任务") as HTMLInputElement;
+    fireEvent.change(todayInput, { target: { value: "会进记录的事" } });
+    fireEvent.click(screen.getByRole("button", { name: "添加到今天" }));
+
+    expect(await screen.findByText("会进记录的事")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "删除任务" }));
+    fireEvent.click(screen.getByRole("button", { name: "设置" }));
+
+    expect(await screen.findByText("本机保存 1 条旧记录")).toBeInTheDocument();
+    expect(screen.getByText("已删除")).toBeInTheDocument();
+    expect(screen.getByText("会进记录的事")).toBeInTheDocument();
   });
 
   it("lets users edit an existing task title from the task row", async () => {

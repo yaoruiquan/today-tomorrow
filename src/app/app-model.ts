@@ -18,7 +18,7 @@ import type {
   QuietModeId
 } from "../features/settings/settings-types";
 import { abandonTask, addTask, moveTask, renameTask, toggleTaskDone } from "../features/tasks/task-reducer";
-import { openTaskCount, tasksInBucket } from "../features/tasks/task-selectors";
+import { historyTasks as selectHistoryTasks, openTaskCount, tasksInBucket } from "../features/tasks/task-selectors";
 import type { Task, TaskBucket } from "../features/tasks/task-types";
 import { createId } from "../shared/lib/ids";
 import { createDefaultAppData } from "./default-app-data";
@@ -50,6 +50,7 @@ interface AppModel {
   activeCoDoTask?: Task;
   todayTasks: ReturnType<typeof tasksInBucket>;
   tomorrowTasks: ReturnType<typeof tasksInBucket>;
+  historyTasks: ReturnType<typeof selectHistoryTasks>;
   reviewTasks: ReturnType<typeof openTodayTasks>;
   addTaskToBucket: (title: string, bucket: TaskBucket) => void;
   toggleTask: (id: string) => void;
@@ -248,6 +249,8 @@ export function prepareAppDataForToday(
     };
   }
 
+  const keepActiveCoDo = activeCoDoStillOpen(rollover.tasks, loaded.pet.activeCoDoTaskId);
+
   return {
     data: {
       ...loaded,
@@ -259,11 +262,20 @@ export function prepareAppDataForToday(
       },
       pet: {
         ...loaded.pet,
+        activeCoDoTaskId: keepActiveCoDo ? loaded.pet.activeCoDoTaskId : undefined,
+        coDoStartedAt: keepActiveCoDo ? loaded.pet.coDoStartedAt : undefined,
         lastMessage: "明天已经来到今天。"
       }
     },
     changed: true
   };
+}
+
+function activeCoDoStillOpen(tasks: Task[], activeCoDoTaskId?: string): boolean {
+  return Boolean(
+    activeCoDoTaskId &&
+      tasks.some((task) => task.id === activeCoDoTaskId && task.status === "open")
+  );
 }
 
 export function useAppModel(): AppModel {
@@ -361,6 +373,7 @@ export function useAppModel(): AppModel {
     () => ({
       todayTasks: tasksInBucket(data.tasks, "today"),
       tomorrowTasks: tasksInBucket(data.tasks, "tomorrow"),
+      historyTasks: selectHistoryTasks(data.tasks),
       reviewTasks: openTodayTasks(data.tasks)
     }),
     [data.tasks]

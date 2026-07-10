@@ -1097,11 +1097,12 @@ body[data-window="pet"] .pet-window {
 }
 
 .task-item {
+  align-items: start;
   grid-template-columns: 26px minmax(0, 1fr) 42px 26px 26px;
   gap: 6px;
-  height: 40px;
-  overflow: hidden;
-  padding: 4px 6px 4px 8px;
+  height: auto;
+  overflow: visible;
+  padding: 6px 6px 6px 8px;
 }
 
 .task-item .co-do-button,
@@ -1156,7 +1157,7 @@ body[data-window="pet"] .pet-window {
 .co-do-button {
   width: 42px;
   height: 25px;
-  align-self: center;
+  align-self: start;
   border-radius: 999px;
   background: transparent;
   color: var(--clay);
@@ -1172,6 +1173,7 @@ body[data-window="pet"] .pet-window {
 
 .co-do-spacer {
   width: 42px;
+  height: 25px;
 }
 
 .check-button {
@@ -1218,6 +1220,7 @@ body[data-window="pet"] .pet-window {
 .task-title-edit-trigger {
   display: block;
   min-width: 0;
+  width: 100%;
   border: 0;
   padding: 0;
   background: transparent;
@@ -1232,10 +1235,9 @@ body[data-window="pet"] .pet-window {
 }
 
 .task-title {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  display: block;
+  overflow: visible;
+  white-space: pre-wrap;
 }
 
 .task-title-edit-form {
@@ -1246,14 +1248,16 @@ body[data-window="pet"] .pet-window {
 .task-title-edit-input {
   width: 100%;
   min-width: 0;
-  height: 30px;
+  min-height: 72px;
   border: 1px solid var(--theme-focus);
   border-radius: 10px;
-  padding: 0 8px;
+  padding: 7px 8px;
   background: rgba(255, 255, 255, 0.9);
   color: var(--ink);
   font-size: 13px;
+  line-height: 1.3;
   outline: none;
+  resize: vertical;
   box-shadow: 0 0 0 3px var(--theme-body-spill-soft);
 }
 
@@ -1403,6 +1407,58 @@ body[data-window="pet"] .pet-window {
   color: var(--muted);
   font-size: 12px;
   font-weight: 750;
+}
+
+.history-note,
+.history-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.history-list {
+  display: grid;
+  max-height: 138px;
+  gap: 5px;
+  margin: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 3px 0 0;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+.history-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 7px;
+  padding: 6px 7px;
+  border: 1px solid rgba(52, 64, 51, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.history-list span,
+.history-list strong {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.history-list strong {
+  color: var(--theme-selected-bg);
+  font-weight: 750;
+}
+
+.history-list p {
+  grid-column: 1 / -1;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.28;
+  white-space: pre-wrap;
 }
 
 .desktop-settings-row {

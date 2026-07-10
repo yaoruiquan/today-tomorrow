@@ -24,7 +24,7 @@ export function TaskItem({
 }: TaskItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(task.title);
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const editRef = useRef<HTMLTextAreaElement | null>(null);
   const nextBucket: TaskBucket = task.bucket === "today" ? "tomorrow" : "today";
   const isDone = task.status === "done";
 
@@ -36,8 +36,8 @@ export function TaskItem({
     if (!isEditing) return;
 
     window.setTimeout(() => {
-      inputRef.current?.focus();
-      inputRef.current?.select();
+      editRef.current?.focus();
+      editRef.current?.select();
     }, 0);
   }, [isEditing]);
 
@@ -73,16 +73,24 @@ export function TaskItem({
             saveDraftTitle();
           }}
         >
-          <input
-            ref={inputRef}
+          <textarea
+            ref={editRef}
             className="task-title-edit-input"
             value={draftTitle}
+            rows={3}
             onBlur={saveDraftTitle}
             onChange={(event) => setDraftTitle(event.currentTarget.value)}
             onKeyDown={(event) => {
-              if (event.key !== "Escape") return;
-              event.preventDefault();
-              cancelEditing();
+              if (event.key === "Escape") {
+                event.preventDefault();
+                cancelEditing();
+                return;
+              }
+
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                saveDraftTitle();
+              }
             }}
             aria-label="编辑任务标题"
             autoComplete="off"

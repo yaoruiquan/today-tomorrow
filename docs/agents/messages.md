@@ -1320,3 +1320,45 @@ Requests for CEO:
 - None for this fix. CEO decision is only needed for final release acceptance or notarization/Developer ID requirements.
 Risks:
 - The current DMG is ad-hoc signed and not notarized because Apple Developer credentials are not configured locally.
+
+## 2026-07-10 11:52 CST - Product Developer Sends T-014 To QA
+
+DEV UPDATE
+Role: Product Developer
+Thread ID: `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+Task ID: T-014
+Status: ready-for-qa
+Summary:
+Addressed the user's latest data and display feedback. Long task content now wraps fully instead of being clamped, edit mode uses a multiline textarea, deleted tasks and cross-day archived tasks remain in local history records, previous-day Today tasks are hidden from current lists, and previous-day Tomorrow open tasks roll into Today.
+Files changed:
+- `src/features/tasks/task-types.ts`
+- `src/features/tasks/task-selectors.ts`
+- `src/features/tasks/components/task-item.tsx`
+- `src/features/tasks/components/task-panel.tsx`
+- `src/features/tasks/components/task-panel.test.tsx`
+- `src/features/day-cycle/day-rollover.ts`
+- `src/features/day-cycle/day-rollover.test.ts`
+- `src/app/app-model.ts`
+- `src/app/app-model.test.ts`
+- `src/shared/styles/base.css`
+- `docs/product-spec.md`
+- `docs/qa-checklist.md`
+- `docs/agents/board.md`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+- release version files for `0.1.2`
+Verification:
+- `pnpm exec vitest run src/features/day-cycle/day-rollover.test.ts src/app/app-model.test.ts src/features/tasks/components/task-panel.test.tsx src/features/tasks/task-reducer.test.ts` passed: 4 files / 37 tests.
+- `pnpm check` passed: 10 files / 51 tests.
+- `pnpm build` passed.
+- Browser smoke `output/playwright/history-long-text-rollover-smoke-result.json` passed: long row grows, no CSS line clamp, deleted task appears in history, previous Today task is hidden before history opens, previous Tomorrow task rolls into Today, previous Today task archives into history, 0 console/page errors.
+- `cargo fmt --manifest-path src-tauri/Cargo.toml --check` passed.
+- `cargo check --manifest-path src-tauri/Cargo.toml` passed.
+- `pnpm tauri build --bundles dmg` passed for `0.1.2`.
+- `hdiutil verify src-tauri/target/release/bundle/dmg/今天明天_0.1.2_aarch64.dmg` passed.
+- DMG-mounted app passed `codesign --verify --deep --strict --verbose=2`.
+- Installed the DMG-mounted app to `/Applications/今天明天.app`.
+Requests for CEO:
+- None for this fix. CEO decision is only needed for full database/cloud sync scope or notarized distribution.
+Risks:
+- This remains local persistence, not an external database or cloud sync. The current DMG is ad-hoc signed and not notarized.

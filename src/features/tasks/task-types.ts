@@ -1,6 +1,6 @@
 export type TaskBucket = "today" | "tomorrow";
 
-export type TaskStatus = "open" | "done" | "abandoned";
+export type TaskStatus = "open" | "done" | "abandoned" | "archived";
 
 export interface Task {
   id: string;
@@ -11,5 +11,7 @@ export interface Task {
   updatedAt: string;
   completedAt?: string;
   abandonedAt?: string;
+  archivedAt?: string;
+  archivedFromDate?: string;
   carriedFromDate?: string;
 }

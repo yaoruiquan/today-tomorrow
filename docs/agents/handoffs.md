@@ -1916,3 +1916,71 @@ Known risks:
 - The generated DMG and installed app are ad-hoc signed and not notarized. Developer ID signing/notarization remain release-distribution scope.
 
 Please verify and return `QA RESULT`.
+
+## 2026-07-10 11:52 CST - Product Developer -> QA Verifier
+
+DEVELOPMENT -> QA
+Product: 今天明天
+Task ID: T-014
+From: Product Developer / `019f25f8-12e4-70e0-adac-6ae70c1b7aaf`
+To: QA Verifier / `019f2614-56f8-7d40-af98-c1623e892eed`
+Subject: Ready for verification - long text, local history, and day-boundary cleanup
+
+Implemented:
+- Long task titles now wrap fully in the task row instead of being clipped by a fixed 40px row and two-line clamp.
+- Task title edit mode now uses a multiline textarea; Enter saves and Shift+Enter can keep a line break.
+- Added explicit `archived` task status plus `archivedAt` / `archivedFromDate` metadata.
+- Deleted tasks remain `abandoned` in local persisted data and appear in the compact `记录` section inside settings.
+- Previous-day Today tasks are archived and hidden from the current Today/Tomorrow lists.
+- Previous-day Tomorrow open tasks roll into the new day's Today list.
+- Stale current-list tasks from older persisted data are also archived, even if older code already wrote today's `lastOpenedLocalDate`.
+- Active co-do state is cleared if its task is archived during day cleanup.
+- Updated product spec, QA checklist, agent board/messages/handoff notes, and release version to `0.1.2`.
+
+Changed files:
+- `src/features/tasks/task-types.ts`
+- `src/features/tasks/task-selectors.ts`
+- `src/features/tasks/components/task-item.tsx`
+- `src/features/tasks/components/task-panel.tsx`
+- `src/features/tasks/components/task-panel.test.tsx`
+- `src/features/day-cycle/day-rollover.ts`
+- `src/features/day-cycle/day-rollover.test.ts`
+- `src/app/app-model.ts`
+- `src/app/app-model.test.ts`
+- `src/shared/styles/base.css`
+- `docs/product-spec.md`
+- `docs/qa-checklist.md`
+- `docs/agents/board.md`
+- `docs/agents/messages.md`
+- `docs/agents/handoffs.md`
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/Cargo.lock`
+- `src-tauri/tauri.conf.json`
+
+Verification already run:
+- `pnpm exec vitest run src/features/day-cycle/day-rollover.test.ts src/app/app-model.test.ts src/features/tasks/components/task-panel.test.tsx src/features/tasks/task-reducer.test.ts` passed: 4 files / 37 tests.
+- `pnpm check` passed: lint, typecheck, and Vitest all green; 10 test files / 51 tests.
+- `pnpm build` passed.
+- Browser smoke with system Chrome at `560x600` passed: `output/playwright/history-long-text-rollover-smoke-result.json` has 8 checks, 0 failures, 0 console errors, and 0 page errors.
+- Smoke screenshots saved: `output/playwright/history-long-text-smoke.png`, `output/playwright/rollover-history-smoke.png`.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" cargo fmt --manifest-path src-tauri/Cargo.toml --check` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" cargo check --manifest-path src-tauri/Cargo.toml` passed.
+- `PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH" pnpm tauri build --bundles dmg` passed for `0.1.2`.
+- `hdiutil verify src-tauri/target/release/bundle/dmg/今天明天_0.1.2_aarch64.dmg` passed.
+- DMG-mounted app passed `codesign --verify --deep --strict --verbose=2`.
+- Installed the DMG-mounted app to `/Applications/今天明天.app` and launched it.
+
+Acceptance criteria to verify:
+- Long task content is fully visible in task rows and wraps naturally.
+- Editing long task content is possible through the multiline edit field.
+- Deleting a task hides it from Today/Tomorrow and keeps it in local `记录` as `已删除`.
+- A previous-day Today task is not shown in the current Today list after launch/day prep.
+- A previous-day Today task is kept in local history as `已归档`.
+- A previous-day Tomorrow open task appears in the current Today list.
+- The product continues using local Tauri JSON persistence / Web localStorage fallback, without introducing cloud sync or a heavy database UI.
+
+Known risks:
+- This is local history, not cloud database/sync. The generated DMG and installed app are ad-hoc signed and not notarized.
+
+Please verify and return `QA RESULT`.

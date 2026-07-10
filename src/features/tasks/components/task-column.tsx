@@ -40,7 +40,7 @@ export function TaskColumn({
   onStartCoDo,
   onStopCoDo
 }: TaskColumnProps) {
-  const visibleTasks = tasks.filter((task) => task.status !== "abandoned");
+  const visibleTasks = tasks.filter((task) => task.status === "open" || task.status === "done");
 
   return (
     <section

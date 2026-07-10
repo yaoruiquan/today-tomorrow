@@ -2,7 +2,12 @@ import React from "react";
 import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { clearAppData, loadAppData, saveAppData } from "./app-storage";
-import { completeEveningReviewState, getGentleReminderCandidate, useAppModel } from "./app-model";
+import {
+  completeEveningReviewState,
+  getGentleReminderCandidate,
+  prepareAppDataForToday,
+  useAppModel
+} from "./app-model";
 import { createDefaultAppData } from "./default-app-data";
 
 describe("app storage", () => {
@@ -164,6 +169,53 @@ describe("app model", () => {
 
     expect(secondReview.growth.eveningReviewCount).toBe(1);
     expect(secondReview.growth.eveningReviewStreak).toBe(1);
+  });
+
+  it("archives previous today tasks and carries tomorrow tasks into the new day", () => {
+    const data = {
+      ...createDefaultAppData("2026-07-03"),
+      tasks: [
+        {
+          id: "task-today-old",
+          title: "昨天没做完的今天",
+          bucket: "today" as const,
+          status: "open" as const,
+          createdAt: "2026-07-03T08:00:00.000Z",
+          updatedAt: "2026-07-03T08:00:00.000Z"
+        },
+        {
+          id: "task-tomorrow-old",
+          title: "昨天放到明天",
+          bucket: "tomorrow" as const,
+          status: "open" as const,
+          createdAt: "2026-07-03T10:00:00.000Z",
+          updatedAt: "2026-07-03T10:00:00.000Z"
+        }
+      ],
+      pet: {
+        ...createDefaultAppData("2026-07-03").pet,
+        activeCoDoTaskId: "task-today-old",
+        coDoStartedAt: "2026-07-03T08:00:00.000Z"
+      }
+    };
+
+    const prepared = prepareAppDataForToday(data, "2026-07-04", "2026-07-04T09:00:00.000Z");
+
+    expect(prepared.changed).toBe(true);
+    expect(prepared.data.dayCycle.lastOpenedLocalDate).toBe("2026-07-04");
+    expect(prepared.data.tasks[0]).toMatchObject({
+      id: "task-today-old",
+      status: "archived",
+      archivedFromDate: "2026-07-03"
+    });
+    expect(prepared.data.tasks[1]).toMatchObject({
+      id: "task-tomorrow-old",
+      bucket: "today",
+      status: "open",
+      carriedFromDate: "2026-07-03"
+    });
+    expect(prepared.data.pet.activeCoDoTaskId).toBeUndefined();
+    expect(prepared.data.pet.coDoStartedAt).toBeUndefined();
   });
 
   it("updates theme and glow preferences without changing tasks", () => {
